@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Prime Housing">
+  <defs>
+    <linearGradient id="phGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7A084A" />
+      <stop offset="100%" stop-color="#9B0B5E" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#phGrad)" />
+  <path
+    d="M32 14L13 30h6v18h26V30h6L32 14zm0 6.2L41 28v15H23V28l9-7.8z"
+    fill="#FFFFFF"
+  />
+  <rect x="28" y="33" width="8" height="10" rx="1" fill="#F5D0E5" />
+</svg>

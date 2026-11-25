@@ -1,8 +1,18 @@
+<IfModule mod_mime.c>
+  AddType application/javascript .js .mjs
+  AddType text/css .css
+  AddType image/svg+xml .svg
+  AddType image/x-icon .ico
+  AddType image/webp .webp
+  AddType font/woff2 .woff2
+</IfModule>
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
   RewriteRule ^index\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteCond %{REQUEST_URI} !\.(js|mjs|cjs|ts|tsx|jsx|css|scss|map|json|png|jpg|jpeg|gif|webp|svg|ico|avif|woff|woff2|ttf|eot|otf|pdf|txt|xml|wasm)$ [NC]
   RewriteRule . /index.html [L]
 </IfModule>
