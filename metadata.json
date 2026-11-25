@@ -1,0 +1,8 @@
+{
+  "name": "prime housing",
+  "description": "Real estate property listing, landowner submission, and buyer enquiry management application.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

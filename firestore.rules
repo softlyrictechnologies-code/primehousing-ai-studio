@@ -1,0 +1,141 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function hasStaffClaim() {
+      return isSignedIn() && (
+        request.auth.token.admin == true ||
+        request.auth.token.superAdmin == true ||
+        (request.auth.token.role is string &&
+          request.auth.token.role.lower() in ['admin', 'super_admin', 'super-admin', 'editor', 'support'])
+      );
+    }
+
+    function hasAdminDoc() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isStaff() {
+      return hasStaffClaim() || hasAdminDoc();
+    }
+
+    function isAdmin() {
+      return isStaff() && (
+        !isSignedIn() ? false : (
+          request.auth.token.admin == true ||
+          request.auth.token.superAdmin == true ||
+          hasAdminDoc() ||
+          (request.auth.token.role is string &&
+            request.auth.token.role.lower() in ['admin', 'super_admin', 'super-admin', 'editor'])
+        )
+      );
+    }
+
+    function isValidTenDigitPhone(phone) {
+      return phone is string && phone.matches('^[0-9]{10}$');
+    }
+
+    // Public website & hero section CMS documents (read-only for visitors, CRUD for admins)
+    match /websiteContent/{docId} {
+      allow get: if docId in ['site', 'main'] || resource.data.published == true || isStaff();
+      allow list: if resource.data.published == true || isStaff();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /siteSettings/{docId} {
+      allow get: if docId == 'main' || resource.data.published == true || isStaff();
+      allow list: if isStaff();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /settings/{docId} {
+      allow get: if docId == 'content' || isStaff();
+      allow list: if isStaff();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Published real estate listings
+    match /properties/{propertyId} {
+      allow read: if resource.data.published == true || isStaff();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Dynamic real estate projects (e.g. Thangaraj City & future projects)
+    match /projects/{projectId} {
+      allow read: if resource.data.status == 'published' || resource.data.published == true || isStaff();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Active locations
+    match /locations/{locationId} {
+      allow read: if resource.data.active == true || isStaff();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Published market insights
+    match /insights/{insightId} {
+      allow read: if resource.data.published == true || isStaff();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Public buyer & project enquiries (create-only for visitors, managed by staff/admin)
+    match /inquiries/{inquiryId} {
+      allow create: if request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && isValidTenDigitPhone(request.resource.data.phone)
+        && request.resource.data.status == 'new';
+      allow read, update, delete: if isStaff();
+    }
+
+    // Public contact messages (create-only for visitors, managed by staff/admin)
+    match /contactMessages/{messageId} {
+      allow create: if request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && isValidTenDigitPhone(request.resource.data.phone)
+        && request.resource.data.message is string
+        && request.resource.data.status == 'new';
+      allow read, update, delete: if isStaff();
+    }
+
+    // Public landowner property submissions (create-only for visitors, reviewed by staff/admin)
+    match /sellerSubmissions/{submissionId} {
+      allow create: if request.resource.data.sellerName is string
+        && request.resource.data.sellerName.size() > 0
+        && isValidTenDigitPhone(request.resource.data.sellerPhone)
+        && request.resource.data.status == 'pending'
+        && request.resource.data.reviewStatus == 'pending'
+        && request.resource.data.consentToContact == true;
+      allow read, update, delete: if isStaff();
+    }
+
+    // Staff & admin registry
+    match /admins/{uid} {
+      allow get: if isSignedIn() && (request.auth.uid == uid || isStaff());
+      allow list: if isStaff();
+      allow create, update, delete: if isSignedIn() &&
+        (request.auth.token.superAdmin == true ||
+         (request.auth.token.role is string && request.auth.token.role.lower() in ['super_admin', 'super-admin']));
+    }
+
+    // Authenticated user profiles
+    match /users/{uid} {
+      allow read, write: if isSignedIn() && (request.auth.uid == uid || isStaff());
+    }
+
+    // Admin audit trail
+    match /adminLogs/{logId} {
+      allow read, create: if isStaff();
+      allow update, delete: if false;
+    }
+
+    // Deny all other paths by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

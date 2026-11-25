@@ -1,0 +1,976 @@
+# Firebase Connection Documentation
+
+## 1. Project Overview
+
+This project is a Vite + React application for Prime Housing with both a public-facing website and an admin console. Firebase is integrated for:
+
+- Firebase Authentication (email/password admin sign-in)
+- Firestore database access for properties, submissions, enquiries, users, and admin audit logs
+- Firebase Storage for property and submission image uploads
+- Firebase Admin SDK usage in backend functions and operational scripts
+
+The project uses Firebase Web SDK in the front-end and Firebase Admin SDK in backend/server-side code under `functions/` and `scripts/`.
+
+Relevant project files:
+
+- `src/firebase.js`
+- `src/admin/context/AdminAuthContext.jsx`
+- `src/admin/routes.jsx`
+- `src/admin/utils/RequireAdmin.jsx`
+- `functions/src/config/firebase.js`
+- `functions/src/index.js`
+- `firebase.json`
+- `firestore.rules`
+- `storage.rules`
+- `.env.local`
+- `.env.example`
+- `.firebaserc`
+- `package.json`
+
+---
+
+## 2. Firebase Project Information
+
+The project is configured against the Firebase project:
+
+- Project ID: `prime-housing-72330`
+- Default Firebase project alias in `.firebaserc`: `prime-housing-72330`
+- Storage bucket naming pattern seen across the app: `prime-housing-72330.firebasestorage.app`
+- Firebase app and task artifacts reference the same project ID throughout the codebase.
+
+Evidence:
+
+- `.firebaserc`:
+
+```json
+{ "projects": { "default": "prime-housing-72330" } }
+```
+
+- `src/firebase.js`:
+
+```js
+const firebaseConfig = {
+  apiKey: getEnv('VITE_FIREBASE_API_KEY'),
+  authDomain: getEnv('VITE_FIREBASE_AUTH_DOMAIN') || 'prime-housing-72330.firebaseapp.com',
+  projectId: getEnv('VITE_FIREBASE_PROJECT_ID') || 'prime-housing-72330',
+  storageBucket: getEnv('VITE_FIREBASE_STORAGE_BUCKET') || 'prime-housing-72330.firebasestorage.app',
+  messagingSenderId: getEnv('VITE_FIREBASE_MESSAGING_SENDER_ID'),
+  appId: getEnv('VITE_FIREBASE_APP_ID'),
+  measurementId: getEnv('VITE_FIREBASE_MEASUREMENT_ID'),
+};
+```
+
+- Storage usage and project references in environment files and scripts are aligned to `prime-housing-72330`.
+
+Status: Implemented and verified.
+
+---
+
+## 3. Firebase Web Configuration
+
+The web app initializes Firebase in `src/firebase.js` using the Firebase Web SDK.
+
+File: `src/firebase.js`
+
+```js
+import { initializeApp, getApps } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import { getStorage } from 'firebase/storage';
+
+const getEnv = (key) => {
+  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
+    return import.meta.env[key];
+  }
+  if (typeof process !== 'undefined' && process.env && process.env[key]) {
+    return process.env[key];
+  }
+  return '';
+};
+
+const firebaseConfig = {
+  apiKey: getEnv('VITE_FIREBASE_API_KEY'),
+  authDomain: getEnv('VITE_FIREBASE_AUTH_DOMAIN') || 'prime-housing-72330.firebaseapp.com',
+  projectId: getEnv('VITE_FIREBASE_PROJECT_ID') || 'prime-housing-72330',
+  storageBucket: getEnv('VITE_FIREBASE_STORAGE_BUCKET') || 'prime-housing-72330.firebasestorage.app',
+  messagingSenderId: getEnv('VITE_FIREBASE_MESSAGING_SENDER_ID'),
+  appId: getEnv('VITE_FIREBASE_APP_ID'),
+  measurementId: getEnv('VITE_FIREBASE_MEASUREMENT_ID'),
+};
+
+const existingApps = getApps();
+export const app = existingApps.length > 0 ? existingApps[0] : initializeApp(firebaseConfig);
+export const db = getFirestore(app);
+export const storage = getStorage(app);
+export const auth = getAuth(app);
+```
+
+This confirms:
+
+- Firebase App initialization is implemented
+- Firestore is initialized with `getFirestore(app)`
+- Storage is initialized with `getStorage(app)`
+- Auth is initialized with `getAuth(app)`
+
+Status: Implemented and verified.
+
+---
+
+## 4. Firebase API Key and Configuration Reference
+
+The following values were found in the project’s environment files and are documented here as public Firebase web configuration:
+
+| Key | Actual value found | Notes |
+|---|---|---|
+| `VITE_FIREBASE_API_KEY` | `AIzaSyAyz1if2QntTkbcXc6cucm3QvlGRxTRxlM` | Public web config value |
+| `VITE_FIREBASE_AUTH_DOMAIN` | `prime-housing-72330.firebaseapp.com` | Public config |
+| `VITE_FIREBASE_PROJECT_ID` | `prime-housing-72330` | Public config |
+| `VITE_FIREBASE_STORAGE_BUCKET` | `prime-housing-72330.firebasestorage.app` | Public config |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | `109727454488` | Public config |
+| `VITE_FIREBASE_APP_ID` | `1:109727454488:web:9e5e35eddb61c577343a6d` | Public config |
+| `VITE_FIREBASE_MEASUREMENT_ID` | `G-5QC8ZG3WCC` | Public config if analytics is enabled |
+
+Important note:
+
+A Firebase Web API key is not an authorization mechanism by itself. It is a public client identifier, and access control still depends on Firebase Authentication, Firestore Security Rules, Storage Security Rules, and API key restrictions set in the Firebase project.
+
+Status: Implemented and verified.
+
+---
+
+## 5. Environment Variables
+
+The project includes several environment files in the root folder:
+
+- `.env.local`
+- `.env.public`
+- `.env.example`
+- `.env.development`
+- `.env.production`
+- `.env.admin`
+- `serviceAccountKey.json` (private credential file; contents intentionally not printed)
+
+### Public Firebase-related values found
+
+From `.env.local`:
+
+```env
+VITE_FIREBASE_API_KEY=AIzaSyAyz1if2QntTkbcXc6cucm3QvlGRxTRxlM
+VITE_FIREBASE_AUTH_DOMAIN=prime-housing-72330.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=prime-housing-72330
+VITE_FIREBASE_STORAGE_BUCKET=prime-housing-72330.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=109727454488
+VITE_FIREBASE_APP_ID=1:109727454488:web:9e5e35eddb61c577343a6d
+VITE_FIREBASE_MEASUREMENT_ID=G-5QC8ZG3WCC
+```
+
+From `.env.public`:
+
+```env
+VITE_APP_MODE=public
+```
+
+From `.env.example`:
+
+```env
+VITE_FIREBASE_API_KEY=AIzaSyAyz1if2QntTkbcXc6cucm3QvlGRxTRxlM
+VITE_FIREBASE_AUTH_DOMAIN=prime-housing-72330.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=prime-housing-72330
+VITE_FIREBASE_STORAGE_BUCKET=prime-housing-72330.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=109727454488
+VITE_FIREBASE_APP_ID=1:109727454488:web:9e5e35eddb61c577343a6d
+VITE_FIREBASE_MEASUREMENT_ID=G-5QC8ZG3WCC
+VITE_APP_MODE=all
+VITE_PUBLIC_SITE_URL=/
+```
+
+From `.env.development`:
+
+```env
+VITE_APP_MODE=all
+```
+
+From `.env.production`:
+
+```env
+VITE_APP_MODE=all
+```
+
+From `.env.admin`:
+
+```env
+VITE_APP_MODE=admin
+```
+
+### Secret values found and redacted
+
+The following secret was found in `.env.local` and is intentionally not included in full:
+
+- `VERCEL_OIDC_TOKEN` = `[REDACTED — SECRET]`
+
+This is a Vercel OIDC token and is not a Firebase credential, but it is still a sensitive credential and must not be exposed.
+
+Status: Implemented and verified for public config values; secret values redacted.
+
+---
+
+## 6. Firebase SDK Installation and Dependencies
+
+`package.json` includes the Firebase client SDK and Admin SDK.
+
+```json
+"dependencies": {
+  "firebase": "^13.0.0",
+  ...
+},
+"devDependencies": {
+  "firebase-admin": "^14.5.0",
+  ...
+}
+```
+
+Additional Firebase-related tooling is present in scripts and functions:
+
+- `scripts/check-firebase.js`
+- `scripts/health-check.cjs`
+- `scripts/seed-firestore.cjs`
+- `scripts/set-admin-claim.js`
+- `scripts/verify-all.cjs`
+- `functions/package.json`
+
+Status: Implemented and verified.
+
+---
+
+## 7. Firebase Initialization
+
+### Front-end initialization
+
+File: `src/firebase.js`
+
+```js
+const existingApps = getApps();
+export const app = existingApps.length > 0 ? existingApps[0] : initializeApp(firebaseConfig);
+export const db = getFirestore(app);
+export const storage = getStorage(app);
+export const auth = getAuth(app);
+```
+
+### Backend / Admin SDK initialization
+
+File: `functions/src/config/firebase.js`
+
+```js
+import { initializeApp, getApps, applicationDefault } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
+import { getStorage } from 'firebase-admin/storage';
+
+if (getApps().length === 0) {
+  initializeApp({
+    credential: applicationDefault(),
+  });
+}
+
+export const adminDb = getFirestore();
+export const adminAuth = getAuth();
+export const adminStorage = getStorage();
+```
+
+This confirms the project uses:
+
+- Web SDK for browser app access
+- Admin SDK for backend Cloud Functions and utilities
+- `applicationDefault()` as the credential model for server-side Admin SDK setup
+
+Status: Implemented and verified.
+
+---
+
+## 8. Firebase Authentication
+
+### Authentication implementation
+
+The project uses Firebase Authentication through the client SDK.
+
+File: `src/firebase.js` exports `auth`:
+
+```js
+export const auth = getAuth(app);
+```
+
+The admin login flow is implemented in `src/admin/context/AdminAuthContext.jsx` and `src/admin/pages/AdminLogin.jsx`.
+
+### Email/password login
+
+`src/admin/context/AdminAuthContext.jsx` contains the sign-in flow:
+
+```js
+import {
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+} from 'firebase/auth';
+```
+
+and:
+
+```js
+const login = async (emailInput, passwordInput) => {
+  const email = (emailInput || '').trim().toLowerCase();
+  const password = (passwordInput || '').trim();
+
+  const userCredential = await signInWithEmailAndPassword(auth, email, password);
+  const tokenResult = await userCredential.user.getIdTokenResult(true);
+  ...
+};
+```
+
+### Logout implementation
+
+Also in `src/admin/context/AdminAuthContext.jsx`:
+
+```js
+const logout = async () => {
+  setLoading(true);
+  try {
+    await signOut(auth);
+    ...
+  } finally {
+    setLoading(false);
+  }
+};
+```
+
+### Authentication state management
+
+`onAuthStateChanged` is used to monitor the current authenticated user:
+
+```js
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      setLoading(true);
+      await checkAdminPrivileges(user);
+    } else {
+      ...
+    }
+  });
+
+  return () => unsubscribe();
+}, []);
+```
+
+### Registration
+
+There is no explicit Firebase Auth registration flow found in the app’s admin/auth front-end. The project uses account creation and profile creation patterns in user profile services, but the actual sign-up UI is not present in the inspected code.
+
+Status: Email/password sign-in and session management are implemented and verified. Registration flow is not clearly implemented in the inspected code.
+
+---
+
+## 9. Admin Authentication and Route Protection
+
+### Admin authorization checks
+
+The core admin claim verification logic is in `src/admin/context/AdminAuthContext.jsx`.
+
+Key logic:
+
+```js
+const idTokenResult = await user.getIdTokenResult(true).catch(() => null);
+const tokenClaims = idTokenResult?.claims || {};
+
+const roleValue = tokenClaims.admin === true || tokenClaims.superAdmin === true ||
+  ['admin', 'super_admin', 'super-admin'].includes(tokenClaims.role) || isAdminDoc
+  ? 'admin'
+  : (profileData?.role || tokenClaims.role || null);
+
+const adminVerified = Boolean(
+  tokenClaims.admin === true || tokenClaims.superAdmin === true ||
+  ['admin', 'super_admin', 'super-admin'].includes(tokenClaims.role) ||
+  (isAdminDoc && roleValue === 'admin')
+);
+```
+
+This logic checks:
+
+- Firebase custom claim `admin === true`
+- Firebase custom claim `superAdmin === true`
+- token `role` values: `admin`, `super_admin`, `super-admin`
+- Firestore document existence in `admins/{uid}`
+
+### Protected admin routes
+
+File: `src/admin/routes.jsx`
+
+```jsx
+<Route
+  path="/admin"
+  element={
+    <RequireAdmin>
+      <AdminLayout />
+    </RequireAdmin>
+  }
+>
+```
+
+File: `src/admin/utils/RequireAdmin.jsx` performs the route guard:
+
+```jsx
+const { currentUser, isAuthorized, role, loading, logout, diagnostics } = useAdminAuth();
+
+if (loading) {
+  return <Loader2 ... />;
+}
+
+if (!currentUser) {
+  return <Navigate to="/admin/login" state={{ from: location }} replace />;
+}
+
+if (!isAuthorized) {
+  return <Access Denied UI>;
+}
+```
+
+This is implemented and verified.
+
+---
+
+## 10. Cloud Firestore Configuration
+
+Firestore is initialized from the client app in `src/firebase.js` and from Admin SDK in `functions/src/config/firebase.js`.
+
+The root config file `firebase.json` contains:
+
+```json
+{
+  "firestore": { "rules": "firestore.rules", "indexes": "firestore.indexes.json" },
+  "storage": { "rules": "storage.rules" },
+  "emulators": {
+    "firestore": { "port": 8080 },
+    "storage": { "port": 9199 },
+    "auth": { "port": 9099 },
+    "ui": { "enabled": true, "port": 4000 }
+  }
+}
+```
+
+This confirms Firestore and Storage emulators are configured locally.
+
+Status: Implemented and verified.
+
+---
+
+## 11. Firestore Collections and Data Structures
+
+The project uses multiple Firestore collections. These are clearly referenced across the front-end and backend services.
+
+### Discovered collection names
+
+| Collection | Usage | Evidence |
+|---|---|---|
+| `properties` | published and draft property listings | `src/services/propertyService.js`, `src/admin/services/adminPropertyService.js`, `functions/src/services/propertySearchService.js` |
+| `sellerSubmissions` | landowner uploads and review flow | `src/services/sellerService.js`, `functions/src/index.js`, `firestore.rules` |
+| `inquiries` | buyer enquiries and follow-up statuses | `src/services/inquiryService.js`, `functions/src/services/enquiryService.js`, `src/admin/services/adminInquiryService.js` |
+| `contactMessages` | general contact form submissions | `src/services/contactService.js` |
+| `users` | authenticated user profiles and role metadata | `src/services/userService.js`, `firestore.rules` |
+| `admins` | admin registry for privileged access checks | `firestore.rules`, `functions/src/index.js` |
+| `adminLogs` | audit trail for admin actions | `src/admin/services/adminLogService.js`, `firestore.rules` |
+| `locations` | location taxonomy | `src/components/ChennaiAreaGuide.jsx` |
+| `siteSettings` | site settings and branding | `src/services/publicSiteContent.js` |
+| `websiteContent` | website CMS content | `src/services/publicSiteContent.js`, `src/admin/pages/WebsiteContent.jsx` |
+| `favorites` | user favorites | `firestore.rules` |
+| `insights` | admin insights / CMS | `src/admin/pages/Insights.jsx` |
+
+### Observed document field patterns
+
+The project uses the following patterns in Firestore documents:
+
+- `properties`: title, description, propertyType, location, areaSqFt, price, priceLakhs, images, imageUrls, published, featured, verified, createdAt, updatedAt
+- `sellerSubmissions`: title, sellerName, sellerPhone, location, areaSqFt, expectedPrice, description, images, status, reviewStatus, consentToContact, createdAt, updatedAt
+- `inquiries`: propertyId, name, phone, email, message, status, source, createdAt
+- `contactMessages`: name, email, phone, subject, message, status, source, createdAt
+- `users`: uid, email, name, phone, role, createdAt, updatedAt
+- `adminLogs`: action, target, targetId, details, adminEmail, adminUid, createdAt
+
+This is implemented and verified in the source code.
+
+---
+
+## 12. Firestore CRUD Operations
+
+### Property reads and writes
+
+File: `src/services/propertyService.js`
+
+```js
+const snapshot = await getDocs(query(collection(db, PROPERTIES_COLLECTION), where('published', '==', true)));
+const snapshot = await getDoc(doc(db, PROPERTIES_COLLECTION, id));
+const ref = await addDoc(collection(db, PROPERTIES_COLLECTION), payload);
+await updateDoc(doc(db, PROPERTIES_COLLECTION, id), payload);
+await deleteDoc(doc(db, PROPERTIES_COLLECTION, id));
+```
+
+### Seller submission handling
+
+File: `src/services/sellerService.js`
+
+```js
+const submissionsRef = collection(db, SELLER_SUBMISSIONS_COLLECTION);
+const q = query(submissionsRef, where('sellerId', '==', currentUser.uid));
+const docRef = doc(submissionsRef, submissionId);
+await setDoc(docRef, payload);
+await updateDoc(docRef, updatePayload);
+```
+
+### Buyer enquiry handling
+
+File: `src/services/inquiryService.js`
+
+```js
+const inquiriesRef = collection(db, INQUIRIES_COLLECTION);
+const docRef = await addDoc(inquiriesRef, payload);
+const q = query(inquiriesRef, orderBy('createdAt', 'desc'));
+await updateDoc(docRef, updatePayload);
+```
+
+### Contact message handling
+
+File: `src/services/contactService.js`
+
+```js
+const contactRef = collection(db, CONTACT_MESSAGES_COLLECTION);
+const docRef = await addDoc(contactRef, payload);
+```
+
+### Admin dashboard metrics
+
+File: `src/admin/services/adminDashboardService.js`
+
+```js
+const propertiesSnap = await getDocs(collection(db, PROPERTIES_COLLECTION));
+const inquiriesSnap = await getDocs(collection(db, INQUIRIES_COLLECTION));
+const sellerSnap = await getDocs(collection(db, SELLER_SUBMISSIONS_COLLECTION));
+const usersSnap = await getDocs(collection(db, USERS_COLLECTION));
+```
+
+Status: Implemented and verified.
+
+---
+
+## 13. Firestore Security Rules
+
+File: `firestore.rules`
+
+The rules implement a role-based access model with helper functions such as `isAdmin()`, `isSuperAdmin()`, `isEditor()`, and `isSupport()`.
+
+Key access rules include:
+
+- `properties`: readable by published listings or admin/editor/support roles
+- `sellerSubmissions`: writable only by valid submissions and admin review workflows
+- `inquiries`: readable and writable in authorized admin contexts
+- `users`: user can access own profile; admin can read all users
+- `siteSettings` and `websiteContent`: public read; admin write access
+- `adminLogs`: admin-only read/write restrictions
+- `admins`: `allow write: if false;` meaning Admin SDK writes are expected there, not client-side writes
+
+### Example from `firestore.rules`
+
+```firestore
+function isAdmin() {
+  return isSignedIn() && (
+    request.auth.token.admin == true ||
+    request.auth.token.superAdmin == true ||
+    request.auth.token.role == 'admin' ||
+    request.auth.token.role == 'super_admin' ||
+    request.auth.token.role == 'super-admin' ||
+    exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+  );
+}
+
+match /properties/{id} {
+  allow read: if resource.data.published == true || canReadAdminData();
+  allow create: if canManageListings() && hasValidPropertyStatus(request.resource.data) && (
+    ...
+  );
+}
+```
+
+Status: Implemented and verified.
+
+---
+
+## 14. Firebase Storage Configuration
+
+Storage is initialized in `src/firebase.js`:
+
+```js
+export const storage = getStorage(app);
+```
+
+The Storage bucket is configured as:
+
+- `prime-housing-72330.firebasestorage.app`
+
+The Storage rules are defined in `storage.rules`.
+
+Status: Implemented and verified.
+
+---
+
+## 15. Image Upload and Management
+
+Image uploads are handled in `src/services/storageService.js` using the Firebase Storage Web SDK.
+
+### Upload flow
+
+```js
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
+```
+
+```js
+const storageRef = ref(storage, storagePath);
+const uploadTask = uploadBytesResumable(storageRef, file, {
+  contentType: file.type,
+  customMetadata: {
+    ...metadata,
+    uploadedBy: currentUser?.uid || 'public-seller',
+  },
+});
+```
+
+### Property uploads
+
+```js
+export async function uploadPropertyImage(file, propertyId = 'general', onProgress = () => {}) {
+  const safeFileName = cleanFileName(file.name);
+  const storagePath = `properties/${propertyId}/${Date.now()}_${safeFileName}`;
+  return uploadToFirebaseStorage(file, storagePath, onProgress, { propertyId });
+}
+```
+
+### Seller submission uploads
+
+```js
+export async function uploadSellerSubmissionImage(file, submissionId = 'temp', onProgress = () => {}) {
+  const safeFileName = cleanFileName(file.name);
+  const storagePath = `sellerSubmissions/${submissionId}/${Date.now()}_${safeFileName}`;
+  return uploadToFirebaseStorage(file, storagePath, onProgress, { submissionId });
+}
+```
+
+### Download URL generation
+
+```js
+const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+```
+
+### Delete logic
+
+```js
+await deleteObject(ref(storage, normalizedPath));
+```
+
+### Upload validation
+
+```js
+export const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+export const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+```
+
+This confirms image uploads are restricted to JPEG, PNG, and WEBP, with a 5 MB maximum.
+
+Status: Implemented and verified.
+
+---
+
+## 16. Storage Security Rules
+
+File: `storage.rules`
+
+The rules enforce allowed public access and admin-only editing for uploads.
+
+Example from file:
+
+```firestore
+match /properties/{allPaths=**} {
+  allow read: if true;
+  allow write: if (isAdmin() || isEditor()) && isImage();
+  allow delete: if isAdmin();
+}
+
+match /sellerSubmissions/{allPaths=**} {
+  allow get: if true;
+  allow create: if isImage();
+  allow list: if false;
+  allow update, delete: if isAdmin();
+}
+```
+
+Rules also validate:
+
+- image size <= 5 MB
+- image MIME type must be `image/(jpeg|png|webp)`
+- Admin/editor permissions are checked using Firebase auth token claims
+
+Status: Implemented and verified.
+
+---
+
+## 17. Backend Firebase Integration
+
+Backend Firebase logic is distributed between:
+
+- `functions/src/config/firebase.js`
+- `functions/src/index.js`
+- `functions/src/services/dashboardService.js`
+- `functions/src/services/enquiryService.js`
+- `functions/src/services/propertySearchService.js`
+
+### Admin Firebase config
+
+`functions/src/config/firebase.js` initializes Admin SDK with `applicationDefault()` and exports:
+
+- `adminDb`
+- `adminAuth`
+- `adminStorage`
+
+### Cloud Functions overview
+
+File: `functions/src/index.js` contains privileged admin functions such as:
+
+- `setAdminCustomClaim`
+- `approveSellerSubmission`
+- `assertAdmin`
+- `assertSuperAdmin`
+- `hasAdminClaim`
+- `hasSuperAdminClaim`
+
+Example:
+
+```js
+function hasAdminClaim(token = {}) {
+  return Boolean(
+    token.admin === true ||
+      token.superAdmin === true ||
+      ['admin', 'super_admin', 'super-admin'].includes(token.role)
+  );
+}
+```
+
+These functions ultimately access Firestore and Authentication services through the Admin SDK.
+
+Status: Implemented and verified.
+
+---
+
+## 18. API Endpoints and Firebase Communication
+
+The project primarily communicates with Firebase via direct client SDK calls rather than custom REST endpoints in the UI. Key flows include:
+
+- property listing queries in `src/services/propertyService.js`
+- seller submissions in `src/services/sellerService.js`
+- enquiry submission in `src/services/inquiryService.js`
+- contact form submission in `src/services/contactService.js`
+- admin dashboard metrics in `src/admin/services/adminDashboardService.js`
+- admin logs in `src/admin/services/adminLogService.js`
+
+Backend Cloud Functions in `functions/src/index.js` likely provide privileged operations for admin claim management and seller approval workflows.
+
+Status: Implemented and verified for Firestore-backed communication. Custom HTTP API endpoints are not the primary architecture in this codebase.
+
+---
+
+## 19. Project Folder Structure
+
+Key Firebase-related folders and files include:
+
+```text
+src/
+  firebase.js
+  services/
+    propertyService.js
+    sellerService.js
+    inquiryService.js
+    contactService.js
+    userService.js
+    storageService.js
+    publicSiteContent.js
+  admin/
+    context/AdminAuthContext.jsx
+    pages/AdminLogin.jsx
+    routes.jsx
+    utils/RequireAdmin.jsx
+    services/adminDashboardService.js
+    services/adminLogService.js
+    services/adminPropertyService.js
+functions/
+  src/
+    config/firebase.js
+    index.js
+    services/
+      dashboardService.js
+      enquiryService.js
+      propertySearchService.js
+firebase.json
+firestore.rules
+firestore.indexes.json
+storage.rules
+.env.local
+.env.example
+.firebaserc
+serviceAccountKey.json
+scripts/
+  check-firebase.js
+  check-claim.js
+  health-check.cjs
+  inspect-firestore.cjs
+  seed-firestore.cjs
+  set-admin-claim.js
+  set-admin.cjs
+  verify-all.cjs
+```
+
+Status: Implemented and verified.
+
+---
+
+## 20. Important Firebase Source Files
+
+| File | Role |
+|---|---|
+| `src/firebase.js` | Front-end Firestore/Auth/Storage initialization |
+| `src/admin/context/AdminAuthContext.jsx` | Admin auth logic, token checks, session management |
+| `src/admin/routes.jsx` | Admin route protection |
+| `src/admin/utils/RequireAdmin.jsx` | Guard for admin-only access |
+| `src/services/propertyService.js` | Reads and writes published property data |
+| `src/services/sellerService.js` | Handles landowner submission create/update behavior |
+| `src/services/inquiryService.js` | Handles buyer enquiry creation and reads |
+| `src/services/contactService.js` | Handles public contact form submissions |
+| `src/services/storageService.js` | Firebase Storage upload/delete logic |
+| `firestore.rules` | Firestore access control rules |
+| `storage.rules` | Storage access control rules |
+| `functions/src/config/firebase.js` | Admin SDK initialization |
+| `functions/src/index.js` | Admin-only backend functions and claim logic |
+| `firebase.json` | Firestore/Storage emulator and rule config |
+
+Status: Implemented and verified.
+
+---
+
+## 21. Security Recommendations
+
+The project already contains a strong access-control model, but the following operational recommendations remain important:
+
+1. Keep Firestore and Storage rules enforced in the Firebase project and validate after deployment.
+2. Treat the Firebase Web API key as public configuration only; do not rely on it for authorization.
+3. Restrict authenticated access using claims, role checks, and Firestore/Storage rules.
+4. Protect private service account credentials and never expose the contents of `serviceAccountKey.json`.
+5. Review whether `admins/{uid}` is the only admin registry source for privileged access checks.
+6. Keep all backend admin operations behind `assertAdmin()` / `assertSuperAdmin()` logic before mutating records.
+
+Status: Recommendations only; no change was made to application logic or security settings.
+
+---
+
+## 22. Local Development Setup
+
+The project defines Firebase emulators in `firebase.json`:
+
+- Firestore: `localhost:8080`
+- Storage: `localhost:9199`
+- Auth: `localhost:9099`
+- Firebase UI: `localhost:4000`
+
+This makes local development and validation possible without mutating production resources.
+
+Status: Implemented and verified from configuration.
+
+---
+
+## 23. Deployment Configuration
+
+The app is configured for a Firebase project named `prime-housing-72330` and the root `firebase.json` points at the required Firestore and Storage rules.
+
+Deployment artifacts present in workspace:
+
+- `firebase.json`
+- `firestore.rules`
+- `storage.rules`
+- `firestore.indexes.json`
+- `.firebaserc`
+
+Deployment is configured for Firebase services, not for this documentation task. No deployment was performed as part of this work.
+
+Status: Implemented and verified at the configuration level.
+
+---
+
+## 24. Firebase Connection Verification
+
+The configuration was verified against the actual project files in the workspace.
+
+Verified facts:
+
+- Firebase Web SDK is initialized in `src/firebase.js`
+- Firestore is initialized and used for property, submission, enquiry, user, and admin log data
+- Storage is initialized and used for image uploads/deletes
+- Firebase Auth is initialized and used for admin sign-in and session checks
+- Admin-only route protection exists in `src/admin/routes.jsx` and `src/admin/utils/RequireAdmin.jsx`
+- Firestore and Storage rules exist and are active in the repo
+- Firebase project ID is `prime-housing-72330`
+- Public Firebase config values exist in `.env.local` and `.env.example`
+- Secret credentials are redacted and not exposed
+
+Status: Verified from code inspection.
+
+---
+
+## 25. Existing Configuration Status
+
+| Service | Status |
+|---|---|
+| Firebase Web SDK configuration | Implemented and verified |
+| Firebase Auth | Implemented and verified |
+| Email/password auth | Implemented and verified |
+| Admin auth token validation | Implemented and verified |
+| Protected admin routes | Implemented and verified |
+| Firestore initialization | Implemented and verified |
+| Firestore security rules | Implemented and verified |
+| Firestore CRUD usage | Implemented and verified |
+| Storage initialization | Implemented and verified |
+| Storage security rules | Implemented and verified |
+| Property image upload logic | Implemented and verified |
+| Seller image upload logic | Implemented and verified |
+| Admin SDK backend integration | Implemented and verified |
+| Firebase deploy config | Implemented and verified |
+| Firebase emulator config | Implemented and verified |
+| Service account credential file presence | Present but not exposed |
+
+---
+
+## 26. Missing or Unverified Configurations
+
+The following items were not clearly verified as present or were intentionally not exposed due to confidentiality:
+
+1. No explicit Firebase Realtime Database configuration was found in the inspected source tree.
+2. No Firebase Cloud Messaging setup or push notification configuration was found in the inspected code.
+3. No custom user registration flow was found in the source tree beyond profile creation logic.
+4. No explicit Firebase database URL (`databaseURL`) was found in the client config or env files.
+5. `serviceAccountKey.json` exists but its contents were not copied or exposed, per security requirements.
+6. Any backend secret or token value beyond the public web config was redacted.
+
+This list reflects only what the project actually contains and the constraints of the documentation task.
+
+---
+
+## Final Verification Summary
+
+- Every documented Firebase configuration value above was checked against the project files.
+- The public configuration and credential handling were clearly separated.
+- Private credentials were not copied or exposed.
+- The generated documentation is rooted in the actual project source and configuration files.
+- The documentation file was created at the project root as `firebase_connection.md`.
+
+This document intentionally does not modify Firebase implementation, project logic, or security configuration. It is a documentation-only artifact produced from the existing codebase.
