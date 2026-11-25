@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -77,6 +78,7 @@ function isValidFrontendRoute(reqPath: string): boolean {
   return false;
 }
 
+app.disable('x-powered-by');
 app.set('trust proxy', true);
 app.use(express.json());
 
