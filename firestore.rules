@@ -6,32 +6,92 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function hasStaffClaim() {
+    function hasAdminDoc() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function adminDoc() {
+      return get(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isDeactivatedAdmin() {
+      return hasAdminDoc() && adminDoc().data.active == false;
+    }
+
+    function hasActiveAdminDoc() {
+      return hasAdminDoc() && adminDoc().data.active != false;
+    }
+
+    function hasSuperAdminClaim() {
       return isSignedIn() && (
-        request.auth.token.admin == true ||
         request.auth.token.superAdmin == true ||
         (request.auth.token.role is string &&
-          request.auth.token.role.lower() in ['admin', 'super_admin', 'super-admin', 'editor', 'support'])
+          request.auth.token.role.lower() in ['super_admin', 'super-admin'])
       );
     }
 
-    function hasAdminDoc() {
-      return isSignedIn() &&
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    function hasAdminClaim() {
+      return isSignedIn() && (
+        request.auth.token.admin == true ||
+        (request.auth.token.role is string &&
+          request.auth.token.role.lower() == 'admin')
+      );
+    }
+
+    function hasEditorClaim() {
+      return isSignedIn()
+        && request.auth.token.role is string
+        && request.auth.token.role.lower() == 'editor';
+    }
+
+    function hasSupportClaim() {
+      return isSignedIn()
+        && request.auth.token.role is string
+        && request.auth.token.role.lower() == 'support';
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && !isDeactivatedAdmin() && (
+        hasSuperAdminClaim() ||
+        (hasActiveAdminDoc()
+          && adminDoc().data.role is string
+          && adminDoc().data.role.lower() in ['super_admin', 'super-admin'])
+      );
+    }
+
+    function isAdminOrSuperAdmin() {
+      return isSuperAdmin() || (
+        isSignedIn() && !isDeactivatedAdmin() && (
+          hasAdminClaim() ||
+          (hasActiveAdminDoc() && (
+            !('role' in adminDoc().data) ||
+            !(adminDoc().data.role is string) ||
+            adminDoc().data.role.lower() == '' ||
+            adminDoc().data.role.lower() == 'admin'
+          ))
+        )
+      );
+    }
+
+    function isEditorOrAbove() {
+      return isAdminOrSuperAdmin() || (
+        isSignedIn() && !isDeactivatedAdmin() && (
+          hasEditorClaim() ||
+          (hasActiveAdminDoc()
+            && adminDoc().data.role is string
+            && adminDoc().data.role.lower() == 'editor')
+        )
+      );
     }
 
     function isStaff() {
-      return hasStaffClaim() || hasAdminDoc();
-    }
-
-    function isAdmin() {
-      return isStaff() && (
-        !isSignedIn() ? false : (
-          request.auth.token.admin == true ||
-          request.auth.token.superAdmin == true ||
-          hasAdminDoc() ||
-          (request.auth.token.role is string &&
-            request.auth.token.role.lower() in ['admin', 'super_admin', 'super-admin', 'editor'])
+      return isEditorOrAbove() || (
+        isSignedIn() && !isDeactivatedAdmin() && (
+          hasSupportClaim() ||
+          (hasActiveAdminDoc()
+            && adminDoc().data.role is string
+            && adminDoc().data.role.lower() == 'support')
         )
       );
     }
@@ -40,96 +100,243 @@ service cloud.firestore {
       return phone is string && phone.matches('^[0-9]{10}$');
     }
 
-    // Public website & hero section CMS documents (read-only for visitors, CRUD for admins)
+    function isValidOptionalString(data, field, maxLen) {
+      return !(field in data) || (data[field] is string && data[field].size() <= maxLen);
+    }
+
+    function isProjectLockedToSuperAdmin(projData) {
+      return ('editPermissions' in projData)
+        && (projData.editPermissions is map)
+        && projData.editPermissions.accessMode == 'super_admin_only';
+    }
+
+    function canStaffModifyProject(projData) {
+      return isSuperAdmin() || (
+        isEditorOrAbove()
+        && !isProjectLockedToSuperAdmin(projData)
+        && (
+          !('editPermissions' in projData)
+          || !(projData.editPermissions is map)
+          || projData.editPermissions.accessMode != 'custom_roles'
+          || (
+            ('allowedRoles' in projData.editPermissions)
+            && (projData.editPermissions.allowedRoles is list)
+            && (
+              (isAdminOrSuperAdmin() && 'admin' in projData.editPermissions.allowedRoles)
+              || ('editor' in projData.editPermissions.allowedRoles)
+            )
+          )
+        )
+      );
+    }
+
+    // Public website & hero section CMS documents (read-only for visitors, editor+ write, admin+ delete)
     match /websiteContent/{docId} {
       allow get: if docId in ['site', 'main'] || resource.data.published == true || isStaff();
       allow list: if resource.data.published == true || isStaff();
-      allow create, update, delete: if isAdmin();
+      allow create, update: if isEditorOrAbove();
+      allow delete: if isAdminOrSuperAdmin();
     }
 
     match /siteSettings/{docId} {
       allow get: if docId == 'main' || resource.data.published == true || isStaff();
       allow list: if isStaff();
-      allow create, update, delete: if isAdmin();
+      allow create, update: if isEditorOrAbove();
+      allow delete: if isAdminOrSuperAdmin();
     }
 
     match /settings/{docId} {
       allow get: if docId == 'content' || isStaff();
       allow list: if isStaff();
-      allow create, update, delete: if isAdmin();
+      allow create, update: if isEditorOrAbove();
+      allow delete: if isAdminOrSuperAdmin();
     }
 
-    // Published real estate listings
+    // Real estate property listings (public read only when published == true)
     match /properties/{propertyId} {
       allow read: if resource.data.published == true || isStaff();
-      allow create, update, delete: if isAdmin();
+      allow create, update: if isEditorOrAbove();
+      allow delete: if isAdminOrSuperAdmin();
     }
 
-    // Dynamic real estate projects (e.g. Thangaraj City & future projects)
+    // Dynamic real estate projects (respects super_admin_only & custom_roles lock settings)
     match /projects/{projectId} {
       allow read: if resource.data.status == 'published' || resource.data.published == true || isStaff();
-      allow create, update, delete: if isAdmin();
+      allow create: if isEditorOrAbove()
+        && (!isProjectLockedToSuperAdmin(request.resource.data) || isSuperAdmin());
+      allow update: if isSuperAdmin()
+        || (canStaffModifyProject(resource.data) && !isProjectLockedToSuperAdmin(request.resource.data));
+      allow delete: if isSuperAdmin()
+        || (isAdminOrSuperAdmin() && canStaffModifyProject(resource.data));
     }
 
-    // Active locations
+    // Approved locations (public read only when active == true)
     match /locations/{locationId} {
       allow read: if resource.data.active == true || isStaff();
-      allow create, update, delete: if isAdmin();
+      allow create, update: if isEditorOrAbove();
+      allow delete: if isAdminOrSuperAdmin();
     }
 
-    // Published market insights
+    // Market insights (public read only when published == true)
     match /insights/{insightId} {
       allow read: if resource.data.published == true || isStaff();
-      allow create, update, delete: if isAdmin();
+      allow create, update: if isEditorOrAbove();
+      allow delete: if isAdminOrSuperAdmin();
     }
 
-    // Public buyer & project enquiries (create-only for visitors, managed by staff/admin)
+    // Public buyer & project enquiries (strict schema CREATE only for visitors; staff read/update; admin delete)
     match /inquiries/{inquiryId} {
-      allow create: if request.resource.data.name is string
+      allow create: if request.resource.data.keys().hasOnly([
+          'name', 'phone', 'email', 'address', 'message',
+          'propertyId', 'propertyTitle', 'projectId', 'projectName', 'projectSlug',
+          'enquiryCategory', 'source', 'status', 'createdAt'
+        ])
+        && request.resource.data.name is string
         && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 120
         && isValidTenDigitPhone(request.resource.data.phone)
-        && request.resource.data.status == 'new';
-      allow read, update, delete: if isStaff();
-    }
-
-    // Public contact messages (create-only for visitors, managed by staff/admin)
-    match /contactMessages/{messageId} {
-      allow create: if request.resource.data.name is string
-        && request.resource.data.name.size() > 0
-        && isValidTenDigitPhone(request.resource.data.phone)
+        && isValidOptionalString(request.resource.data, 'email', 254)
+        && isValidOptionalString(request.resource.data, 'address', 300)
         && request.resource.data.message is string
-        && request.resource.data.status == 'new';
-      allow read, update, delete: if isStaff();
+        && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() <= 2000
+        && isValidOptionalString(request.resource.data, 'propertyId', 120)
+        && isValidOptionalString(request.resource.data, 'propertyTitle', 200)
+        && isValidOptionalString(request.resource.data, 'projectId', 120)
+        && isValidOptionalString(request.resource.data, 'projectName', 200)
+        && isValidOptionalString(request.resource.data, 'projectSlug', 160)
+        && isValidOptionalString(request.resource.data, 'enquiryCategory', 120)
+        && isValidOptionalString(request.resource.data, 'source', 80)
+        && request.resource.data.status == 'new'
+        && request.resource.data.createdAt == request.time;
+      allow read, update: if isStaff();
+      allow delete: if isAdminOrSuperAdmin();
     }
 
-    // Public landowner property submissions (create-only for visitors, reviewed by staff/admin)
+    // Public contact messages (strict schema CREATE only for visitors; staff read/update; admin delete)
+    match /contactMessages/{messageId} {
+      allow create: if request.resource.data.keys().hasOnly([
+          'name', 'email', 'phone', 'subject', 'message', 'status', 'source', 'createdAt'
+        ])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 120
+        && isValidTenDigitPhone(request.resource.data.phone)
+        && isValidOptionalString(request.resource.data, 'email', 254)
+        && isValidOptionalString(request.resource.data, 'subject', 200)
+        && request.resource.data.message is string
+        && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() <= 2000
+        && isValidOptionalString(request.resource.data, 'source', 80)
+        && request.resource.data.status == 'new'
+        && request.resource.data.createdAt == request.time;
+      allow read, update: if isStaff();
+      allow delete: if isAdminOrSuperAdmin();
+    }
+
+    // Public landowner property submissions (strict schema CREATE only for visitors; staff read/update; admin delete)
     match /sellerSubmissions/{submissionId} {
-      allow create: if request.resource.data.sellerName is string
+      allow create: if request.resource.data.keys().hasOnly([
+          'title', 'sellerName', 'sellerPhone', 'sellerEmail', 'location', 'districtTownVillage',
+          'propertyType', 'areaSqFt', 'area', 'areaUnit', 'areaValue', 'expectedPrice',
+          'description', 'roadAccess', 'approvalDetails', 'additionalNotes',
+          'images', 'storagePaths', 'status', 'reviewStatus', 'consentToContact',
+          'sellerId', 'createdAt', 'updatedAt'
+        ])
+        && isValidOptionalString(request.resource.data, 'title', 200)
+        && request.resource.data.sellerName is string
         && request.resource.data.sellerName.size() > 0
+        && request.resource.data.sellerName.size() <= 120
         && isValidTenDigitPhone(request.resource.data.sellerPhone)
+        && isValidOptionalString(request.resource.data, 'sellerEmail', 254)
+        && request.resource.data.location is string
+        && request.resource.data.location.size() > 0
+        && request.resource.data.location.size() <= 160
+        && request.resource.data.districtTownVillage is string
+        && request.resource.data.districtTownVillage.size() > 0
+        && request.resource.data.districtTownVillage.size() <= 160
+        && request.resource.data.propertyType is string
+        && request.resource.data.propertyType.size() > 0
+        && request.resource.data.propertyType.size() <= 80
+        && request.resource.data.areaSqFt is number
+        && request.resource.data.areaSqFt > 0
+        && isValidOptionalString(request.resource.data, 'area', 80)
+        && isValidOptionalString(request.resource.data, 'areaUnit', 40)
+        && request.resource.data.areaValue is number
+        && request.resource.data.areaValue > 0
+        && request.resource.data.expectedPrice is number
+        && request.resource.data.expectedPrice > 0
+        && request.resource.data.description is string
+        && request.resource.data.description.size() > 0
+        && request.resource.data.description.size() <= 2000
+        && isValidOptionalString(request.resource.data, 'roadAccess', 160)
+        && isValidOptionalString(request.resource.data, 'approvalDetails', 200)
+        && isValidOptionalString(request.resource.data, 'additionalNotes', 1000)
+        && request.resource.data.images is list
+        && request.resource.data.images.size() <= 10
+        && request.resource.data.storagePaths is list
+        && request.resource.data.storagePaths.size() <= 10
         && request.resource.data.status == 'pending'
         && request.resource.data.reviewStatus == 'pending'
-        && request.resource.data.consentToContact == true;
-      allow read, update, delete: if isStaff();
+        && request.resource.data.consentToContact == true
+        && (!('sellerId' in request.resource.data) || (isSignedIn() && request.resource.data.sellerId == request.auth.uid))
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow read, update: if isStaff();
+      allow delete: if isAdminOrSuperAdmin();
     }
 
-    // Staff & admin registry
+    // Staff & admin registry (strictly super_admin managed)
     match /admins/{uid} {
       allow get: if isSignedIn() && (request.auth.uid == uid || isStaff());
       allow list: if isStaff();
-      allow create, update, delete: if isSignedIn() &&
-        (request.auth.token.superAdmin == true ||
-         (request.auth.token.role is string && request.auth.token.role.lower() in ['super_admin', 'super-admin']));
+      allow create, update, delete: if isSuperAdmin();
     }
 
-    // Authenticated user profiles
+    // Authenticated user profiles (owners cannot elevate roles or write disallowed keys)
     match /users/{uid} {
-      allow read, write: if isSignedIn() && (request.auth.uid == uid || isStaff());
+      allow read: if isSignedIn() && (request.auth.uid == uid || isStaff());
+      allow create: if isSignedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly([
+          'uid', 'email', 'name', 'phone', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.uid == uid
+        && isValidOptionalString(request.resource.data, 'email', 254)
+        && isValidOptionalString(request.resource.data, 'name', 120)
+        && isValidOptionalString(request.resource.data, 'phone', 30)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow update: if isSuperAdmin() || (
+        isSignedIn() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'uid', 'email', 'name', 'phone', 'updatedAt'
+        ])
+        && request.resource.data.uid == uid
+        && isValidOptionalString(request.resource.data, 'email', 254)
+        && isValidOptionalString(request.resource.data, 'name', 120)
+        && isValidOptionalString(request.resource.data, 'phone', 30)
+        && request.resource.data.updatedAt == request.time
+      );
+      allow delete: if isSuperAdmin();
     }
 
-    // Admin audit trail
+    // Immutable admin audit trail
     match /adminLogs/{logId} {
-      allow read, create: if isStaff();
+      allow read: if isStaff();
+      allow create: if isStaff()
+        && request.resource.data.keys().hasOnly([
+          'action', 'target', 'targetId', 'details', 'adminEmail', 'adminUid', 'userId', 'createdAt'
+        ])
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.adminUid == request.auth.uid
+        && request.resource.data.action is string
+        && request.resource.data.action.size() > 0
+        && request.resource.data.action.size() <= 80
+        && isValidOptionalString(request.resource.data, 'target', 80)
+        && isValidOptionalString(request.resource.data, 'targetId', 160)
+        && isValidOptionalString(request.resource.data, 'adminEmail', 254)
+        && (!('details' in request.resource.data) || request.resource.data.details is map)
+        && request.resource.data.createdAt == request.time;
       allow update, delete: if false;
     }
 

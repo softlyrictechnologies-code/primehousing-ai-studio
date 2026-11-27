@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, RotateCcw, Search, X } from 'lucide-react';
-import { getPublishedProperties, queryProperties } from '../../services/propertyService';
+import { getPublishedProperties, parseNumericFilter, queryProperties } from '../../services/propertyService';
 import { getActiveLocations } from '../../services/locationService';
 import { getPublicCategories } from '../../services/publicSiteContent';
 import type {
@@ -42,7 +42,8 @@ export function PropertiesPage() {
   const maxArea = searchParams.get('maxArea') || '';
   const sortBy = (searchParams.get('sort') as PropertyQueryFilters['sortBy']) || 'newest';
   const keyword = searchParams.get('q') || '';
-  const page = Math.max(1, Number(searchParams.get('page') || '1'));
+  const parsedPage = Number(searchParams.get('page') || '1');
+  const page = Number.isFinite(parsedPage) ? Math.max(1, Math.floor(parsedPage)) : 1;
 
   useEffect(() => {
     document.title = 'Properties Catalogue — PRIME HOUSING';
@@ -89,10 +90,10 @@ export function PropertiesPage() {
           location: locationFilter,
           propertyType: typeFilter,
           availability: availabilityFilter,
-          minPrice: minPrice ? Number(minPrice) : undefined,
-          maxPrice: maxPrice ? Number(maxPrice) : undefined,
-          minArea: minArea ? Number(minArea) : undefined,
-          maxArea: maxArea ? Number(maxArea) : undefined,
+          minPrice: parseNumericFilter(minPrice),
+          maxPrice: parseNumericFilter(maxPrice),
+          minArea: parseNumericFilter(minArea),
+          maxArea: parseNumericFilter(maxArea),
           sortBy,
           search: keyword,
           page,
@@ -163,6 +164,11 @@ export function PropertiesPage() {
 
   const hasActiveFilters = Array.from(searchParams.keys()).some((k) => k !== 'page');
 
+  const parsedMinPrice = parseNumericFilter(minPrice);
+  const parsedMaxPrice = parseNumericFilter(maxPrice);
+  const parsedMinArea = parseNumericFilter(minArea);
+  const parsedMaxArea = parseNumericFilter(maxArea);
+
   const activeFilterChips = [
     keyword ? { key: 'q', label: `Keyword: ${keyword}` } : null,
     locationFilter !== 'all' ? { key: 'location', label: `Location: ${locationFilter}` } : null,
@@ -173,10 +179,18 @@ export function PropertiesPage() {
           label: availabilityFilter === 'published' ? 'Available Only' : 'Sold Properties',
         }
       : null,
-    minPrice ? { key: 'minPrice', label: `Min: ${formatCurrency(Number(minPrice))}` } : null,
-    maxPrice ? { key: 'maxPrice', label: `Max: ${formatCurrency(Number(maxPrice))}` } : null,
-    minArea ? { key: 'minArea', label: `Min Size: ${minArea} Sq. Ft.` } : null,
-    maxArea ? { key: 'maxArea', label: `Max Size: ${maxArea} Sq. Ft.` } : null,
+    parsedMinPrice !== undefined
+      ? { key: 'minPrice', label: `Min: ${formatCurrency(parsedMinPrice)}` }
+      : null,
+    parsedMaxPrice !== undefined
+      ? { key: 'maxPrice', label: `Max: ${formatCurrency(parsedMaxPrice)}` }
+      : null,
+    parsedMinArea !== undefined
+      ? { key: 'minArea', label: `Min Size: ${parsedMinArea} Sq. Ft.` }
+      : null,
+    parsedMaxArea !== undefined
+      ? { key: 'maxArea', label: `Max Size: ${parsedMaxArea} Sq. Ft.` }
+      : null,
   ].filter(Boolean) as { key: string; label: string }[];
 
   return (
@@ -257,7 +271,7 @@ export function PropertiesPage() {
             <label className="block text-xs font-medium text-[#646B67] mb-1">Min Price (₹)</label>
             <input
               type="number"
-              min="0"
+              step="any"
               value={minPrice}
               onChange={(e) => updateParam('minPrice', e.target.value)}
               placeholder="0"
@@ -269,7 +283,7 @@ export function PropertiesPage() {
             <label className="block text-xs font-medium text-[#646B67] mb-1">Max Price (₹)</label>
             <input
               type="number"
-              min="0"
+              step="any"
               value={maxPrice}
               onChange={(e) => updateParam('maxPrice', e.target.value)}
               placeholder="Any"
@@ -282,8 +296,7 @@ export function PropertiesPage() {
               <label className="block text-xs font-medium text-[#646B67] mb-1">Min Size (Sq. Ft.)</label>
               <input
                 type="number"
-                min="0"
-                step="100"
+                step="any"
                 value={minArea}
                 onChange={(e) => updateParam('minArea', e.target.value)}
                 placeholder="0"
@@ -294,8 +307,7 @@ export function PropertiesPage() {
               <label className="block text-xs font-medium text-[#646B67] mb-1">Max Size (Sq. Ft.)</label>
               <input
                 type="number"
-                min="0"
-                step="100"
+                step="any"
                 value={maxArea}
                 onChange={(e) => updateParam('maxArea', e.target.value)}
                 placeholder="Any"

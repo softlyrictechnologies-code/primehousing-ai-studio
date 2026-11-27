@@ -29,6 +29,7 @@ export async function logAdminAction({
       details: details && typeof details === 'object' ? details : { note: String(details || '') },
       adminEmail: user.email || '',
       adminUid: user.uid,
+      userId: user.uid,
       createdAt: serverTimestamp(),
     };
     const ref = await addDoc(collection(db, ADMIN_LOGS_COLLECTION), payload);

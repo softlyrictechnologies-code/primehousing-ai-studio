@@ -1,0 +1,45 @@
+name: Run Automated Tests & Rules Verification
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21 for Firebase Emulators
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check application and test files
+        run: npm run lint
+
+      - name: Build production SPA bundle
+        run: npx vite build
+
+      - name: Run filter and build verification tests
+        run: npm test
+
+      - name: Run Firestore & Storage security rules tests against local emulators
+        run: npm run test:rules

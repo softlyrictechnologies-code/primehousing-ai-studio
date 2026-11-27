@@ -1,0 +1,108 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function hasAdminDoc() {
+      return isSignedIn()
+        && firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid));
+    }
+
+    function adminDocData() {
+      return firestore.get(/databases/(default)/documents/admins/$(request.auth.uid)).data;
+    }
+
+    function isDeactivatedAdmin() {
+      return hasAdminDoc() && adminDocData().active == false;
+    }
+
+    function isAuthorizedStaffWriter() {
+      return isSignedIn() && !isDeactivatedAdmin() && (
+        request.auth.token.superAdmin == true ||
+        request.auth.token.admin == true ||
+        (request.auth.token.role is string &&
+          request.auth.token.role.lower() in ['super_admin', 'super-admin', 'admin', 'editor']) ||
+        (hasAdminDoc() && (
+          !('role' in adminDocData()) ||
+          !(adminDocData().role is string) ||
+          adminDocData().role.lower() in ['', 'super_admin', 'super-admin', 'admin', 'editor']
+        ))
+      );
+    }
+
+    function isAuthorizedStaffReader() {
+      return isAuthorizedStaffWriter() || (
+        isSignedIn() && !isDeactivatedAdmin() && (
+          (request.auth.token.role is string && request.auth.token.role.lower() == 'support') ||
+          (hasAdminDoc() && adminDocData().role is string && adminDocData().role.lower() == 'support')
+        )
+      );
+    }
+
+    function isAdminOrSuperAdmin() {
+      return isSignedIn() && !isDeactivatedAdmin() && (
+        request.auth.token.superAdmin == true ||
+        request.auth.token.admin == true ||
+        (request.auth.token.role is string &&
+          request.auth.token.role.lower() in ['super_admin', 'super-admin', 'admin']) ||
+        (hasAdminDoc() && (
+          !('role' in adminDocData()) ||
+          !(adminDocData().role is string) ||
+          adminDocData().role.lower() in ['', 'super_admin', 'super-admin', 'admin']
+        ))
+      );
+    }
+
+    function isValidImage() {
+      return request.resource != null
+        && request.resource.contentType is string
+        && request.resource.contentType.matches('^image/(jpeg|png|webp)$')
+        && request.resource.size > 0
+        && request.resource.size <= 5 * 1024 * 1024;
+    }
+
+    function isValidPdf() {
+      return request.resource != null
+        && request.resource.contentType == 'application/pdf'
+        && request.resource.size > 0
+        && request.resource.size <= 15 * 1024 * 1024;
+    }
+
+    // Optional static brand logo reference
+    match /logo.png {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Property images & fallback project assets (public read; editor/admin write & delete)
+    match /properties/{propertyId}/{fileName} {
+      allow read: if true;
+      allow create, update: if isAuthorizedStaffWriter()
+        && (isValidImage() || (propertyId.matches('^project_.*') && isValidPdf()));
+      allow delete: if isAuthorizedStaffWriter();
+    }
+
+    // Project images & PDF documents (public read; editor/admin write & delete)
+    match /projects/{projectId}/{folderCategory}/{fileName} {
+      allow read: if true;
+      allow create, update: if isAuthorizedStaffWriter()
+        && (isValidImage() || isValidPdf());
+      allow delete: if isAuthorizedStaffWriter();
+    }
+
+    // Private landowner submission images (staff read; editor/admin write; admin/super_admin delete)
+    match /sellerSubmissions/{submissionId}/{fileName} {
+      allow read: if isAuthorizedStaffReader();
+      allow create, update: if isAuthorizedStaffWriter() && isValidImage();
+      allow delete: if isAdminOrSuperAdmin();
+    }
+
+    // Deny all unsupported paths by default
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

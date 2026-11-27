@@ -79,6 +79,7 @@ export async function getAllPropertiesAdmin() {
 }
 
 export async function savePropertyAdmin(propertyInput, imageFiles = [], onProgress = () => {}) {
+  const uploadedPaths = [];
   try {
     const user = auth.currentUser;
     const isUpdate = Boolean(propertyInput.id);
@@ -96,7 +97,6 @@ export async function savePropertyAdmin(propertyInput, imageFiles = [], onProgre
     }
 
     const uploadedUrls = [];
-    const uploadedPaths = [];
     for (let i = 0; i < imageFiles.length; i += 1) {
       const file = imageFiles[i];
       const { downloadUrl, storagePath } = await uploadPropertyImage(file, propertyId, (pct) =>
@@ -111,13 +111,9 @@ export async function savePropertyAdmin(propertyInput, imageFiles = [], onProgre
       : [];
     const finalImages = [...retainedUrls, ...uploadedUrls];
 
-    // Delete any removed Storage images from previous state
     const previousImages = Array.isArray(existingData?.images) ? existingData.images : [];
     const previousPaths = Array.isArray(existingData?.storagePaths) ? existingData.storagePaths : [];
     const removedUrls = previousImages.filter((url) => !retainedUrls.includes(url));
-    for (const removedUrl of removedUrls) {
-      await deleteStorageFile(removedUrl).catch(() => undefined);
-    }
 
     const areaSqFt = toAreaSqFt(propertyInput.area, propertyInput.areaUnit || 'Sq. Ft.');
     const price = Number(propertyInput.price) || 0;
@@ -177,6 +173,10 @@ export async function savePropertyAdmin(propertyInput, imageFiles = [], onProgre
 
     if (existingData) {
       await updateDoc(docRef, payload);
+      // Clean up removed Storage images only after Firestore update succeeds
+      for (const removedUrl of removedUrls) {
+        await deleteStorageFile(removedUrl).catch(() => undefined);
+      }
       await logAdminAction({
         action: 'UPDATE_PROPERTY',
         target: 'properties',
@@ -204,6 +204,9 @@ export async function savePropertyAdmin(propertyInput, imageFiles = [], onProgre
     const updatedSnap = await getDoc(docRef);
     return mapPropertyDoc(updatedSnap);
   } catch (error) {
+    for (const uploadedPath of uploadedPaths) {
+      await deleteStorageFile(uploadedPath).catch(() => undefined);
+    }
     if (error instanceof Error && error.message.startsWith('Cannot publish property:')) {
       throw error;
     }
@@ -292,14 +295,14 @@ export async function deletePropertyAdmin(propertyId) {
     const paths = Array.isArray(existing.storagePaths) ? existing.storagePaths : [];
     const imageUrls = Array.isArray(existing.images) ? existing.images : [];
 
+    await deleteDoc(docRef);
+
     for (const path of paths) {
       await deleteStorageFile(path).catch(() => undefined);
     }
     for (const url of imageUrls) {
       await deleteStorageFile(url).catch(() => undefined);
     }
-
-    await deleteDoc(docRef);
 
     await logAdminAction({
       action: 'DELETE_PROPERTY',

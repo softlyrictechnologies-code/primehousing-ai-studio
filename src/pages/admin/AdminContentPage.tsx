@@ -7,8 +7,12 @@ import {
 } from '../../admin/services/adminInquiryService';
 import { getAllPropertiesAdmin } from '../../admin/services/adminPropertyService';
 import type { LocationOption, Property, WebsiteContent } from '../../types/realEstate';
+import { useAdminAuth } from '../../admin/context/AdminAuthContext';
 
 export function AdminContentPage() {
+  const { role } = useAdminAuth();
+  const normalizedRole = String(role || 'admin').toLowerCase().replace('-', '_');
+  const canMutate = normalizedRole !== 'support';
   const [content, setContent] = useState<WebsiteContent>(EMPTY_WEBSITE_CONTENT);
   const [locations, setLocations] = useState<LocationOption[]>([]);
   const [publishedProperties, setPublishedProperties] = useState<Property[]>([]);
@@ -59,7 +63,7 @@ export function AdminContentPage() {
 
   const handleSave = async (e: FormEvent) => {
     e.preventDefault();
-    if (saving) return;
+    if (saving || !canMutate) return;
     setSaving(true);
     setSavedNotice(false);
     setError('');
@@ -272,8 +276,8 @@ export function AdminContentPage() {
         <div className="flex items-center gap-4">
           <button
             type="submit"
-            disabled={saving}
-            className="px-6 py-2.5 text-sm font-medium text-white bg-[#9B0B5E] hover:bg-[#7A084A] rounded-lg transition-colors"
+            disabled={saving || !canMutate}
+            className="px-6 py-2.5 text-sm font-medium text-white bg-[#9B0B5E] hover:bg-[#7A084A] disabled:opacity-45 disabled:cursor-not-allowed rounded-lg transition-colors"
           >
             {saving ? 'Saving Changes...' : 'Save Website Content'}
           </button>

@@ -9,8 +9,12 @@ import type { LandownerSubmission, SubmissionReviewStatus } from '../../types/re
 import { formatArea, formatCurrency, formatDate, generateReference } from '../../utils/formatters';
 import { PropertyFormModal, type PropertyDraftInput } from '../../components/PropertyFormModal';
 import { ResilientImage } from '../../components/ResilientImage';
+import { useAdminAuth } from '../../admin/context/AdminAuthContext';
 
 export function AdminSubmissionsPage() {
+  const { role } = useAdminAuth();
+  const normalizedRole = String(role || 'admin').toLowerCase().replace('-', '_');
+  const canConvertToProperty = normalizedRole !== 'support';
   const [submissions, setSubmissions] = useState<LandownerSubmission[]>([]);
   const [statusFilter, setStatusFilter] = useState<'all' | SubmissionReviewStatus>('all');
   const [search, setSearch] = useState('');
@@ -412,8 +416,9 @@ export function AdminSubmissionsPage() {
 
                 <button
                   type="button"
+                  disabled={!canConvertToProperty}
                   onClick={() => setApprovalModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-[#9B0B5E] hover:bg-[#7A084A] rounded-lg"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-[#9B0B5E] hover:bg-[#7A084A] disabled:opacity-45 disabled:cursor-not-allowed rounded-lg"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>Approve &amp; Create Property Listing</span>

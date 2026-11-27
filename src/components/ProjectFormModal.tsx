@@ -531,6 +531,7 @@ export function ProjectFormModal({
     setError('');
     setUploadNotice('');
 
+    let uploadedCount = 0;
     for (let i = 0; i < files.length; i += 1) {
       const file = files[i];
       setUploadingSlot('gallery');
@@ -556,13 +557,16 @@ export function ProjectFormModal({
             gallery: [...prev.images.gallery, item],
           },
         }));
+        uploadedCount += 1;
       } catch (err) {
         setError(err instanceof Error ? err.message : `Failed to upload ${file.name}.`);
       }
     }
     setUploadingSlot(null);
     setUploadProgress(0);
-    setUploadNotice(`Uploaded ${files.length} gallery image(s).`);
+    if (uploadedCount > 0) {
+      setUploadNotice(`Uploaded ${uploadedCount} gallery image(s).`);
+    }
   };
 
   const handleMultiDocUpload = async (
@@ -576,6 +580,7 @@ export function ProjectFormModal({
     setError('');
     setUploadNotice('');
 
+    let uploadedCount = 0;
     for (const file of files) {
       setUploadingSlot(targetList);
       setUploadProgress(0);
@@ -599,13 +604,16 @@ export function ProjectFormModal({
             [targetList]: [...prev.documents[targetList], docItem],
           },
         }));
+        uploadedCount += 1;
       } catch (err) {
         setError(err instanceof Error ? err.message : `Failed to upload ${file.name}.`);
       }
     }
     setUploadingSlot(null);
     setUploadProgress(0);
-    setUploadNotice(`Uploaded ${files.length} document(s).`);
+    if (uploadedCount > 0) {
+      setUploadNotice(`Uploaded ${uploadedCount} document(s).`);
+    }
   };
 
   const handleSaveWithStatus = async (nextStatus?: ProjectStatus, actionLabel = 'save') => {

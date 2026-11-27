@@ -98,7 +98,7 @@ export function canAdminRolePerformProjectAction(role, project, action) {
   if (action === 'edit') return perms.allowContentEdit;
   if (action === 'media') return perms.allowMediaUpload;
   if (action === 'publish') return perms.allowPublishToggle;
-  if (action === 'delete') return perms.allowDelete;
+  if (action === 'delete') return normalizedRole === 'admin' && perms.allowDelete;
   return false;
 }
 

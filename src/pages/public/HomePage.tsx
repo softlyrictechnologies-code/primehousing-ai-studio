@@ -309,8 +309,7 @@ export function HomePage() {
                     </label>
                     <input
                       type="number"
-                      min="0"
-                      step="100000"
+                      step="any"
                       placeholder="e.g. 1500000"
                       value={searchMinPrice}
                       onChange={(e) => setSearchMinPrice(e.target.value)}
@@ -323,8 +322,7 @@ export function HomePage() {
                     </label>
                     <input
                       type="number"
-                      min="0"
-                      step="100000"
+                      step="any"
                       placeholder="e.g. 25000000"
                       value={searchMaxPrice}
                       onChange={(e) => setSearchMaxPrice(e.target.value)}
@@ -337,8 +335,7 @@ export function HomePage() {
                     </label>
                     <input
                       type="number"
-                      min="0"
-                      step="100"
+                      step="any"
                       placeholder="e.g. 600"
                       value={searchMinArea}
                       onChange={(e) => setSearchMinArea(e.target.value)}
@@ -351,8 +348,7 @@ export function HomePage() {
                     </label>
                     <input
                       type="number"
-                      min="0"
-                      step="100"
+                      step="any"
                       placeholder="e.g. 10000"
                       value={searchMaxArea}
                       onChange={(e) => setSearchMaxArea(e.target.value)}

@@ -12,8 +12,13 @@ import type { Property, PropertyStatus } from '../../types/realEstate';
 import { formatArea, formatCurrency } from '../../utils/formatters';
 import { PropertyFormModal, type PropertyDraftInput } from '../../components/PropertyFormModal';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { useAdminAuth } from '../../admin/context/AdminAuthContext';
 
 export function AdminPropertiesPage() {
+  const { role } = useAdminAuth();
+  const normalizedRole = String(role || 'admin').toLowerCase().replace('-', '_');
+  const canMutate = normalizedRole !== 'support';
+  const canDelete = normalizedRole === 'super_admin' || normalizedRole === 'admin';
   const [searchParams, setSearchParams] = useSearchParams();
   const [properties, setProperties] = useState<Property[]>([]);
   const [statusFilter, setStatusFilter] = useState<'all' | PropertyStatus>('all');
@@ -39,13 +44,13 @@ export function AdminPropertiesPage() {
   }, [load]);
 
   useEffect(() => {
-    if (searchParams.get('new') === '1') {
+    if (searchParams.get('new') === '1' && canMutate) {
       setEditingProperty(null);
       setFormOpen(true);
       searchParams.delete('new');
       setSearchParams(searchParams, { replace: true });
     }
-  }, [searchParams, setSearchParams]);
+  }, [canMutate, searchParams, setSearchParams]);
 
   const filtered = properties.filter((p) => {
     if (statusFilter !== 'all' && p.status !== statusFilter) return false;
@@ -112,11 +117,12 @@ export function AdminPropertiesPage() {
         </div>
         <button
           type="button"
+          disabled={!canMutate}
           onClick={() => {
             setEditingProperty(null);
             setFormOpen(true);
           }}
-          className="inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium text-white bg-[#9B0B5E] hover:bg-[#7A084A] rounded-lg transition-colors self-start sm:self-auto"
+          className="inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium text-white bg-[#9B0B5E] hover:bg-[#7A084A] disabled:opacity-45 disabled:cursor-not-allowed rounded-lg transition-colors self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
           <span>Add New Property</span>
@@ -200,9 +206,10 @@ export function AdminPropertiesPage() {
                     <td className="px-4 py-3 text-center">
                       <button
                         type="button"
+                        disabled={!canMutate}
                         onClick={() => handleToggleFeatured(prop.id)}
                         title={prop.isFeatured ? 'Remove from featured' : 'Feature on homepage'}
-                        className={`p-1.5 rounded-md transition-colors ${
+                        className={`p-1.5 rounded-md transition-colors disabled:opacity-45 disabled:cursor-not-allowed ${
                           prop.isFeatured
                             ? 'text-amber-600 bg-amber-50'
                             : 'text-[#D7C8D1] hover:text-[#646B67]'
@@ -214,10 +221,11 @@ export function AdminPropertiesPage() {
                     <td className="px-4 py-3">
                       <select
                         value={prop.status}
+                        disabled={!canMutate}
                         onChange={(e) =>
                           handleStatusChange(prop.id, e.target.value as PropertyStatus)
                         }
-                        className="px-2 py-1 text-xs border border-[#D7C8D1] rounded-md bg-white capitalize"
+                        className="px-2 py-1 text-xs border border-[#D7C8D1] rounded-md bg-white capitalize disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <option value="draft">Draft</option>
                         <option value="published">Published</option>
@@ -229,19 +237,21 @@ export function AdminPropertiesPage() {
                       <div className="inline-flex items-center gap-1.5">
                         <button
                           type="button"
+                          disabled={!canMutate}
                           onClick={() => {
                             setEditingProperty(prop);
                             setFormOpen(true);
                           }}
-                          className="p-1.5 rounded-md text-[#3D4340] hover:bg-[#F7E8F1] hover:text-[#9B0B5E]"
+                          className="p-1.5 rounded-md text-[#3D4340] hover:bg-[#F7E8F1] hover:text-[#9B0B5E] disabled:opacity-45 disabled:cursor-not-allowed"
                           aria-label={`Edit ${prop.title}`}
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
+                          disabled={!canDelete}
                           onClick={() => setDeleteTarget(prop)}
-                          className="p-1.5 rounded-md text-[#646B67] hover:bg-red-50 hover:text-red-700"
+                          className="p-1.5 rounded-md text-[#646B67] hover:bg-red-50 hover:text-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
                           aria-label={`Delete ${prop.title}`}
                         >
                           <Trash2 className="w-3.5 h-3.5" />

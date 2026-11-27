@@ -69,8 +69,28 @@ export function matchesPropertyCategory(propertyType, filterType) {
   );
 }
 
-export async function queryProperties(filters = {}) {
-  let results = await getPublishedProperties();
+/**
+ * Parses a numeric filter value (number or string) without letting empty strings coerce to 0.
+ * Preserves 0 and negative finite numbers, returns undefined for empty/non-finite/NaN values.
+ * @param {unknown} value
+ * @returns {number | undefined}
+ */
+export function parseNumericFilter(value) {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === 'string' && value.trim() === '') return undefined;
+  if (typeof value === 'boolean') return undefined;
+  const parsed = typeof value === 'number' ? value : Number(String(value).trim());
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+/**
+ * Pure filtering, sorting, and pagination pipeline for published property listings.
+ * @param {import('../types/realEstate').Property[]} properties
+ * @param {import('../types/realEstate').PropertyQueryFilters} [filters]
+ * @returns {import('../types/realEstate').PaginatedResult<import('../types/realEstate').Property>}
+ */
+export function filterAndSortProperties(properties = [], filters = {}) {
+  let results = Array.isArray(properties) ? [...properties] : [];
 
   if (filters.availability === 'published') {
     results = results.filter((p) => p.status === 'published');
@@ -79,15 +99,15 @@ export async function queryProperties(filters = {}) {
   }
 
   if (filters.location && filters.location !== 'all') {
-    const locLower = filters.location.toLowerCase();
+    const locLower = String(filters.location).toLowerCase();
     results = results.filter(
       (p) =>
-        p.location.toLowerCase().includes(locLower) ||
-        p.district.toLowerCase().includes(locLower) ||
-        p.town.toLowerCase().includes(locLower) ||
-        p.village.toLowerCase().includes(locLower) ||
-        p.fullAddress.toLowerCase().includes(locLower) ||
-        p.title.toLowerCase().includes(locLower)
+        (p.location || '').toLowerCase().includes(locLower) ||
+        (p.district || '').toLowerCase().includes(locLower) ||
+        (p.town || '').toLowerCase().includes(locLower) ||
+        (p.village || '').toLowerCase().includes(locLower) ||
+        (p.fullAddress || '').toLowerCase().includes(locLower) ||
+        (p.title || '').toLowerCase().includes(locLower)
     );
   }
 
@@ -95,36 +115,40 @@ export async function queryProperties(filters = {}) {
     results = results.filter((p) => matchesPropertyCategory(p.propertyType, filters.propertyType));
   }
 
-  if (typeof filters.minPrice === 'number' && !Number.isNaN(filters.minPrice)) {
-    results = results.filter((p) => p.price >= filters.minPrice);
+  const minPrice = parseNumericFilter(filters.minPrice);
+  const maxPrice = parseNumericFilter(filters.maxPrice);
+  if (minPrice !== undefined) {
+    results = results.filter((p) => Number(p.price) >= minPrice);
   }
-  if (typeof filters.maxPrice === 'number' && !Number.isNaN(filters.maxPrice)) {
-    results = results.filter((p) => p.price <= filters.maxPrice);
-  }
-
-  if (typeof filters.minArea === 'number' && !Number.isNaN(filters.minArea)) {
-    results = results.filter((p) => p.area >= filters.minArea);
-  }
-  if (typeof filters.maxArea === 'number' && !Number.isNaN(filters.maxArea)) {
-    results = results.filter((p) => p.area <= filters.maxArea);
+  if (maxPrice !== undefined) {
+    results = results.filter((p) => Number(p.price) <= maxPrice);
   }
 
-  if (filters.search && filters.search.trim()) {
-    const q = filters.search.trim().toLowerCase();
+  const minArea = parseNumericFilter(filters.minArea);
+  const maxArea = parseNumericFilter(filters.maxArea);
+  if (minArea !== undefined) {
+    results = results.filter((p) => Number(p.area) >= minArea);
+  }
+  if (maxArea !== undefined) {
+    results = results.filter((p) => Number(p.area) <= maxArea);
+  }
+
+  if (filters.search && String(filters.search).trim()) {
+    const q = String(filters.search).trim().toLowerCase();
     results = results.filter(
       (p) =>
-        p.title.toLowerCase().includes(q) ||
-        p.propertyRef.toLowerCase().includes(q) ||
-        p.location.toLowerCase().includes(q) ||
-        p.district.toLowerCase().includes(q) ||
-        p.town.toLowerCase().includes(q) ||
-        p.village.toLowerCase().includes(q) ||
-        p.fullAddress.toLowerCase().includes(q) ||
-        p.propertyType.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q) ||
-        p.approvalDetails.toLowerCase().includes(q) ||
-        p.roadAccess.toLowerCase().includes(q) ||
-        p.features.some((f) => String(f).toLowerCase().includes(q))
+        (p.title || '').toLowerCase().includes(q) ||
+        (p.propertyRef || '').toLowerCase().includes(q) ||
+        (p.location || '').toLowerCase().includes(q) ||
+        (p.district || '').toLowerCase().includes(q) ||
+        (p.town || '').toLowerCase().includes(q) ||
+        (p.village || '').toLowerCase().includes(q) ||
+        (p.fullAddress || '').toLowerCase().includes(q) ||
+        (p.propertyType || '').toLowerCase().includes(q) ||
+        (p.description || '').toLowerCase().includes(q) ||
+        (p.approvalDetails || '').toLowerCase().includes(q) ||
+        (p.roadAccess || '').toLowerCase().includes(q) ||
+        (Array.isArray(p.features) ? p.features : []).some((f) => String(f).toLowerCase().includes(q))
     );
   }
 
@@ -134,20 +158,23 @@ export async function queryProperties(filters = {}) {
       if (a.isFeatured !== b.isFeatured) return a.isFeatured ? -1 : 1;
       return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
     }
-    if (sortBy === 'price_asc') return a.price - b.price;
-    if (sortBy === 'price_desc') return b.price - a.price;
-    if (sortBy === 'area_asc') return a.area - b.area;
-    if (sortBy === 'area_desc') return b.area - a.area;
+    if (sortBy === 'price_asc') return Number(a.price) - Number(b.price);
+    if (sortBy === 'price_desc') return Number(b.price) - Number(a.price);
+    if (sortBy === 'area_asc') return Number(a.area) - Number(b.area);
+    if (sortBy === 'area_desc') return Number(b.area) - Number(a.area);
     if (sortBy === 'oldest') {
       return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
     }
     return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
   });
 
-  const pageSize = filters.pageSize ?? 6;
+  const rawPageSize = Number(filters.pageSize);
+  const pageSize = Number.isFinite(rawPageSize) && rawPageSize >= 1 ? Math.floor(rawPageSize) : 6;
   const total = results.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const page = Math.min(Math.max(1, filters.page ?? 1), totalPages);
+  const rawPage = Number(filters.page);
+  const requestedPage = Number.isFinite(rawPage) ? Math.floor(rawPage) : 1;
+  const page = Math.min(Math.max(1, requestedPage), totalPages);
   const start = (page - 1) * pageSize;
 
   return {
@@ -157,4 +184,9 @@ export async function queryProperties(filters = {}) {
     pageSize,
     totalPages,
   };
+}
+
+export async function queryProperties(filters = {}) {
+  const results = await getPublishedProperties();
+  return filterAndSortProperties(results, filters);
 }

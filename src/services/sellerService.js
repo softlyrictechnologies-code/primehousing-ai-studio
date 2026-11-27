@@ -1,7 +1,7 @@
 import { collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { formatFirebaseError, normalizePhone } from './firebaseUtils';
-import { uploadSellerSubmissionImage } from './storageService';
+import { deleteStorageFile, uploadSellerSubmissionImage } from './storageService';
 
 const SELLER_SUBMISSIONS_COLLECTION = 'sellerSubmissions';
 
@@ -14,13 +14,13 @@ function toAreaSqFt(area, areaUnit) {
 }
 
 export async function createSellerSubmission(input, imageFiles = [], onProgress = () => {}) {
+  const storagePaths = [];
   try {
     const submissionsRef = collection(db, SELLER_SUBMISSIONS_COLLECTION);
     const docRef = doc(submissionsRef);
     const submissionId = docRef.id;
 
     const uploadedUrls = [];
-    const storagePaths = [];
 
     for (let i = 0; i < imageFiles.length; i += 1) {
       const file = imageFiles[i];
@@ -81,6 +81,9 @@ export async function createSellerSubmission(input, imageFiles = [], onProgress 
       submissionRef: submissionId.slice(0, 10).toUpperCase(),
     };
   } catch (error) {
+    for (const uploadedPath of storagePaths) {
+      await deleteStorageFile(uploadedPath).catch(() => undefined);
+    }
     throw formatFirebaseError(error, 'createSellerSubmission', SELLER_SUBMISSIONS_COLLECTION);
   }
 }

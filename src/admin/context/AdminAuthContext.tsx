@@ -77,28 +77,40 @@ async function verifyAdminClaimsAndDoc(user: User): Promise<AdminUserProfile | n
 
   let hasAdminDoc = false;
   let adminDocName = '';
+  let adminDocRole = '';
+  let isDeactivatedInRegistry = false;
   try {
     const adminSnap = await getDoc(doc(db, 'admins', user.uid));
     if (adminSnap.exists()) {
-      hasAdminDoc = true;
       const data = adminSnap.data() || {};
       adminDocName = typeof data.name === 'string' ? data.name : '';
+      const rawDocRole =
+        typeof data.role === 'string' ? data.role.trim().toLowerCase().replace('-', '_') : '';
+      if (data.active === false) {
+        isDeactivatedInRegistry = true;
+      } else if (!rawDocRole || ALLOWED_STAFF_ROLES.includes(rawDocRole)) {
+        hasAdminDoc = true;
+        adminDocRole = rawDocRole || 'admin';
+      }
     }
   } catch {
     // Rules may block reading admins/{uid} for non-admins; rely on claims if readable
   }
 
-  if (!hasAdminClaim && !hasAdminDoc) {
+  if (isDeactivatedInRegistry || (!hasAdminClaim && !hasAdminDoc)) {
     return null;
   }
 
   let resolvedRole = 'admin';
-  if (claims.superAdmin === true || claimRole === 'super_admin' || claimRole === 'super-admin') {
+  const normalizedClaimRole = claimRole.replace('-', '_');
+  if (claims.superAdmin === true || normalizedClaimRole === 'super_admin') {
     resolvedRole = 'super_admin';
-  } else if (claims.admin === true || claimRole === 'admin' || hasAdminDoc) {
+  } else if (claims.admin === true || normalizedClaimRole === 'admin') {
     resolvedRole = 'admin';
-  } else if (claimRole) {
-    resolvedRole = claimRole;
+  } else if (normalizedClaimRole && ALLOWED_STAFF_ROLES.includes(normalizedClaimRole)) {
+    resolvedRole = normalizedClaimRole;
+  } else if (hasAdminDoc && adminDocRole) {
+    resolvedRole = adminDocRole;
   }
 
   return {

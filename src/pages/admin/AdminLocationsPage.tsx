@@ -12,8 +12,13 @@ import {
 } from '../../admin/services/adminInquiryService';
 import type { CategoryOption, LocationOption } from '../../types/realEstate';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { useAdminAuth } from '../../admin/context/AdminAuthContext';
 
 export function AdminLocationsPage() {
+  const { role } = useAdminAuth();
+  const normalizedRole = String(role || 'admin').toLowerCase().replace('-', '_');
+  const canMutate = normalizedRole !== 'support';
+  const canDelete = normalizedRole === 'super_admin' || normalizedRole === 'admin';
   const [locations, setLocations] = useState<LocationOption[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [error, setError] = useState('');
@@ -48,7 +53,7 @@ export function AdminLocationsPage() {
 
   const handleAddLocation = async (e: FormEvent) => {
     e.preventDefault();
-    if (!locName.trim() || !locDistrict.trim()) return;
+    if (!canMutate || !locName.trim() || !locDistrict.trim()) return;
     setError('');
     try {
       await addLocationAdmin({
@@ -67,7 +72,7 @@ export function AdminLocationsPage() {
 
   const handleAddCategory = async (e: FormEvent) => {
     e.preventDefault();
-    if (!catName.trim()) return;
+    if (!canMutate || !catName.trim()) return;
     setError('');
     try {
       await addCategoryAdmin({
@@ -134,7 +139,8 @@ export function AdminLocationsPage() {
               </select>
               <button
                 type="submit"
-                className="inline-flex items-center justify-center px-3 py-2 text-xs font-medium text-white bg-[#9B0B5E] hover:bg-[#7A084A] rounded-lg"
+                disabled={!canMutate}
+                className="inline-flex items-center justify-center px-3 py-2 text-xs font-medium text-white bg-[#9B0B5E] hover:bg-[#7A084A] disabled:opacity-45 disabled:cursor-not-allowed rounded-lg"
               >
                 <Plus className="w-4 h-4" />
               </button>
@@ -153,6 +159,7 @@ export function AdminLocationsPage() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
+                    disabled={!canMutate}
                     onClick={async () => {
                       setError('');
                       try {
@@ -162,7 +169,7 @@ export function AdminLocationsPage() {
                         setError(err instanceof Error ? err.message : 'Unable to update location.');
                       }
                     }}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium ${
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium disabled:opacity-45 disabled:cursor-not-allowed ${
                       loc.active
                         ? 'bg-[#F7E8F1] text-[#9B0B5E]'
                         : 'bg-[#FAF8F9] text-[#646B67]'
@@ -172,8 +179,9 @@ export function AdminLocationsPage() {
                   </button>
                   <button
                     type="button"
+                    disabled={!canDelete}
                     onClick={() => setDeleteLocTarget(loc)}
-                    className="p-1.5 text-[#646B67] hover:text-red-700"
+                    className="p-1.5 text-[#646B67] hover:text-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
                     aria-label={`Delete ${loc.name}`}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -200,7 +208,8 @@ export function AdminLocationsPage() {
               />
               <button
                 type="submit"
-                className="inline-flex items-center gap-1 px-3.5 py-2 text-xs font-medium text-white bg-[#9B0B5E] hover:bg-[#7A084A] rounded-lg"
+                disabled={!canMutate}
+                className="inline-flex items-center gap-1 px-3.5 py-2 text-xs font-medium text-white bg-[#9B0B5E] hover:bg-[#7A084A] disabled:opacity-45 disabled:cursor-not-allowed rounded-lg"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add</span>
@@ -227,6 +236,7 @@ export function AdminLocationsPage() {
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
+                    disabled={!canMutate}
                     onClick={async () => {
                       setError('');
                       try {
@@ -236,7 +246,7 @@ export function AdminLocationsPage() {
                         setError(err instanceof Error ? err.message : 'Unable to update category.');
                       }
                     }}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium ${
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium disabled:opacity-45 disabled:cursor-not-allowed ${
                       cat.active
                         ? 'bg-[#F7E8F1] text-[#9B0B5E]'
                         : 'bg-[#FAF8F9] text-[#646B67]'
@@ -246,8 +256,9 @@ export function AdminLocationsPage() {
                   </button>
                   <button
                     type="button"
+                    disabled={!canDelete}
                     onClick={() => setDeleteCatTarget(cat)}
-                    className="p-1.5 text-[#646B67] hover:text-red-700"
+                    className="p-1.5 text-[#646B67] hover:text-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
                     aria-label={`Delete ${cat.name}`}
                   >
                     <Trash2 className="w-3.5 h-3.5" />

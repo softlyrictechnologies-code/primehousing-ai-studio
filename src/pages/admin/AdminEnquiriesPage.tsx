@@ -12,10 +12,14 @@ import {
 import type { BuyerEnquiry, EnquiryStatus } from '../../types/realEstate';
 import { formatDateTime } from '../../utils/formatters';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { useAdminAuth } from '../../admin/context/AdminAuthContext';
 
 const STATUS_OPTIONS: EnquiryStatus[] = ['New', 'Contacted', 'Follow-up Required', 'Closed'];
 
 export function AdminEnquiriesPage() {
+  const { role } = useAdminAuth();
+  const normalizedRole = String(role || 'admin').toLowerCase().replace('-', '_');
+  const canDelete = normalizedRole === 'super_admin' || normalizedRole === 'admin';
   const [enquiries, setEnquiries] = useState<BuyerEnquiry[]>([]);
   const [statusFilter, setStatusFilter] = useState<'all' | EnquiryStatus>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
@@ -237,9 +241,10 @@ export function AdminEnquiriesPage() {
                         </button>
                         <button
                           type="button"
+                          disabled={!canDelete}
                           onClick={() => setDeleteTarget(enq)}
                           aria-label={`Delete ${enq.enquiryRef}`}
-                          className="p-1.5 rounded-md text-[#646B67] hover:bg-red-50 hover:text-red-700"
+                          className="p-1.5 rounded-md text-[#646B67] hover:bg-red-50 hover:text-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
