@@ -2,58 +2,42 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function hasAdminDoc() {
-      return isSignedIn()
-        && firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid));
-    }
-
-    function adminDocData() {
-      return firestore.get(/databases/(default)/documents/admins/$(request.auth.uid)).data;
-    }
-
-    function isDeactivatedAdmin() {
-      return hasAdminDoc() && adminDocData().active == false;
-    }
-
-    function isAuthorizedStaffWriter() {
-      return isSignedIn() && !isDeactivatedAdmin() && (
-        request.auth.token.superAdmin == true ||
-        request.auth.token.admin == true ||
-        (request.auth.token.role is string &&
-          request.auth.token.role.lower() in ['super_admin', 'super-admin', 'admin', 'editor']) ||
-        (hasAdminDoc() && (
-          !('role' in adminDocData()) ||
-          !(adminDocData().role is string) ||
-          adminDocData().role.lower() in ['', 'super_admin', 'super-admin', 'admin', 'editor']
-        ))
+    function roleRank() {
+      let signedIn = request.auth != null;
+      let uid = signedIn ? request.auth.uid : '__none__';
+      let adminPath = /databases/(default)/documents/admins/$(uid);
+      let hasDoc = signedIn && firestore.exists(adminPath);
+      let docData = hasDoc ? firestore.get(adminPath).data : {};
+      let docActive = !hasDoc || docData.get('active', true) != false;
+      let rawDocRole = hasDoc ? docData.get('role', '') : '';
+      let docRole = rawDocRole is string ? rawDocRole.lower() : '';
+      let docRank = !hasDoc ? 0 : (
+        docRole in ['super_admin', 'super-admin'] ? 4 :
+        (docRole == '' || docRole == 'admin') ? 3 :
+        docRole == 'editor' ? 2 :
+        docRole == 'support' ? 1 : 0
       );
-    }
-
-    function isAuthorizedStaffReader() {
-      return isAuthorizedStaffWriter() || (
-        isSignedIn() && !isDeactivatedAdmin() && (
-          (request.auth.token.role is string && request.auth.token.role.lower() == 'support') ||
-          (hasAdminDoc() && adminDocData().role is string && adminDocData().role.lower() == 'support')
-        )
+      let rawClaimRole = signedIn ? request.auth.token.get('role', '') : '';
+      let claimRole = rawClaimRole is string ? rawClaimRole.lower() : '';
+      let claimRank = !signedIn ? 0 : (
+        (request.auth.token.get('superAdmin', false) == true || claimRole in ['super_admin', 'super-admin']) ? 4 :
+        (request.auth.token.get('admin', false) == true || claimRole == 'admin') ? 3 :
+        claimRole == 'editor' ? 2 :
+        claimRole == 'support' ? 1 : 0
       );
+      return (!signedIn || !docActive) ? 0 : (claimRank > docRank ? claimRank : docRank);
     }
 
     function isAdminOrSuperAdmin() {
-      return isSignedIn() && !isDeactivatedAdmin() && (
-        request.auth.token.superAdmin == true ||
-        request.auth.token.admin == true ||
-        (request.auth.token.role is string &&
-          request.auth.token.role.lower() in ['super_admin', 'super-admin', 'admin']) ||
-        (hasAdminDoc() && (
-          !('role' in adminDocData()) ||
-          !(adminDocData().role is string) ||
-          adminDocData().role.lower() in ['', 'super_admin', 'super-admin', 'admin']
-        ))
-      );
+      return roleRank() >= 3;
+    }
+
+    function isEditorOrAbove() {
+      return roleRank() >= 2;
+    }
+
+    function isStaff() {
+      return roleRank() >= 1;
     }
 
     function isValidImage() {
@@ -80,23 +64,24 @@ service firebase.storage {
     // Property images & fallback project assets (public read; editor/admin write & delete)
     match /properties/{propertyId}/{fileName} {
       allow read: if true;
-      allow create, update: if isAuthorizedStaffWriter()
+      allow create, update: if isEditorOrAbove()
         && (isValidImage() || (propertyId.matches('^project_.*') && isValidPdf()));
-      allow delete: if isAuthorizedStaffWriter();
+      allow delete: if isEditorOrAbove();
     }
 
     // Project images & PDF documents (public read; editor/admin write & delete)
     match /projects/{projectId}/{folderCategory}/{fileName} {
       allow read: if true;
-      allow create, update: if isAuthorizedStaffWriter()
+      allow create, update: if isEditorOrAbove()
         && (isValidImage() || isValidPdf());
-      allow delete: if isAuthorizedStaffWriter();
+      allow delete: if isEditorOrAbove();
     }
 
-    // Private landowner submission images (staff read; editor/admin write; admin/super_admin delete)
+    // Landowner submission images (public valid-image create; staff read/update; admin/super_admin delete)
     match /sellerSubmissions/{submissionId}/{fileName} {
-      allow read: if isAuthorizedStaffReader();
-      allow create, update: if isAuthorizedStaffWriter() && isValidImage();
+      allow read: if isStaff();
+      allow create: if isValidImage();
+      allow update: if isStaff() && isValidImage();
       allow delete: if isAdminOrSuperAdmin();
     }
 

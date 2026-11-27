@@ -41,11 +41,12 @@ describe('Production build and deployment artifact verification', () => {
     expect(fs.existsSync(firebaseJsonPath)).toBe(true);
 
     const firestoreRules = fs.readFileSync(firestoreRulesPath, 'utf8');
-    expect(firestoreRules).toContain('isDeactivatedAdmin()');
+    expect(firestoreRules).toContain('roleRank()');
     expect(firestoreRules).toContain('allow update, delete: if false;');
 
     const storageRules = fs.readFileSync(storageRulesPath, 'utf8');
-    expect(storageRules).toContain('isAuthorizedStaffWriter()');
+    expect(storageRules).toContain('roleRank()');
+    expect(storageRules).toContain('allow create: if isValidImage();');
     expect(storageRules).toContain('match /{allPaths=**}');
   });
 

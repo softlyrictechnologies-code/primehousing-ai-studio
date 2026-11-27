@@ -102,7 +102,7 @@ describe('Firebase Storage Security Rules', () => {
     await assertSucceeds(adminStorage.ref('sellerSubmissions/sub-1/parcel.jpg').delete());
   });
 
-  it('denies unauthenticated writes, non-staff writes, support writes, and deactivated admins', async () => {
+  it('denies unauthenticated writes outside valid sellerSubmissions creates, non-staff writes, support writes, and deactivated admins', async () => {
     const anonStorage = testEnv.unauthenticatedContext().storage();
     const userStorage = testEnv.authenticatedContext('regular-user').storage();
     const supportStorage = testEnv.authenticatedContext('support-uid').storage();
@@ -110,6 +110,41 @@ describe('Firebase Storage Security Rules', () => {
       .authenticatedContext('disabled-uid', { admin: true, role: 'admin' })
       .storage();
 
+    // Public Resale Plots form: anonymous valid image create on sellerSubmissions SUCCEEDS
+    await assertSucceeds(
+      Promise.resolve(
+        anonStorage
+          .ref('sellerSubmissions/sub-new/photo.jpg')
+          .put(makeBytes(64), { contentType: 'image/jpeg' })
+      )
+    );
+
+    // Anonymous wrong MIME type or > 5 MB on sellerSubmissions still FAILS
+    await assertFails(
+      Promise.resolve(
+        anonStorage
+          .ref('sellerSubmissions/sub-new/script.txt')
+          .put(makeBytes(64), { contentType: 'text/plain' })
+      )
+    );
+    await assertFails(
+      Promise.resolve(
+        anonStorage
+          .ref('sellerSubmissions/sub-new/huge.jpg')
+          .put(makeBytes(5 * 1024 * 1024 + 1), { contentType: 'image/jpeg' })
+      )
+    );
+
+    // Anonymous overwrite (update) of existing sellerSubmissions object FAILS
+    await assertFails(
+      Promise.resolve(
+        anonStorage
+          .ref('sellerSubmissions/sub-1/parcel.jpg')
+          .put(makeBytes(64), { contentType: 'image/jpeg' })
+      )
+    );
+
+    // Anonymous writes to properties/ and projects/ still FAIL
     await assertFails(
       Promise.resolve(
         anonStorage.ref('properties/prop-1/hack.jpg').put(makeBytes(64), { contentType: 'image/jpeg' })
@@ -118,10 +153,11 @@ describe('Firebase Storage Security Rules', () => {
     await assertFails(
       Promise.resolve(
         anonStorage
-          .ref('sellerSubmissions/sub-new/photo.jpg')
+          .ref('projects/thangaraj/gallery/hack.jpg')
           .put(makeBytes(64), { contentType: 'image/jpeg' })
       )
     );
+
     await assertFails(
       Promise.resolve(
         userStorage.ref('properties/prop-1/hack.jpg').put(makeBytes(64), { contentType: 'image/jpeg' })

@@ -2,9 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { EMPTY_WEBSITE_CONTENT, getPublicSiteContent } from '../../services/publicSiteContent';
-import { ASSET_IMAGES } from '../../assets/media';
 import type { WebsiteContent } from '../../types/realEstate';
-import { ResilientImage } from '../../components/ResilientImage';
 
 export function AboutPage() {
   const [content, setContent] = useState<WebsiteContent>(EMPTY_WEBSITE_CONTENT);
@@ -35,8 +33,8 @@ export function AboutPage() {
     <div>
       {/* Header */}
       <section className="bg-white border-b border-[#EAE1E6]">
-        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-14 lg:py-20 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
-          <div className="lg:col-span-6">
+        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-14 lg:py-20">
+          <div className="max-w-3xl">
             <p className="text-xs font-medium text-[#9B0B5E] mb-2">About {displayBrandName}</p>
             <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-medium text-[#1C1F1E] tracking-tight leading-[1.15] mb-5">
               Trusted land brokerage built on documented verification.
@@ -47,13 +45,6 @@ export function AboutPage() {
             {content.aboutBackground && (
               <p className="text-sm text-[#646B67] leading-relaxed">{content.aboutBackground}</p>
             )}
-          </div>
-          <div className="lg:col-span-6 rounded-xl overflow-hidden border border-[#EAE1E6] aspect-[4/3]">
-            <ResilientImage
-              src={ASSET_IMAGES.aboutOfficeImg}
-              alt="Advisory Office"
-              className="w-full h-full object-cover"
-            />
           </div>
         </div>
       </section>

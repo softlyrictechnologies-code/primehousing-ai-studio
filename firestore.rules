@@ -6,94 +6,46 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function hasAdminDoc() {
-      return isSignedIn()
-        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
-    }
-
-    function adminDoc() {
-      return get(/databases/$(database)/documents/admins/$(request.auth.uid));
-    }
-
-    function isDeactivatedAdmin() {
-      return hasAdminDoc() && adminDoc().data.active == false;
-    }
-
-    function hasActiveAdminDoc() {
-      return hasAdminDoc() && adminDoc().data.active != false;
-    }
-
-    function hasSuperAdminClaim() {
-      return isSignedIn() && (
-        request.auth.token.superAdmin == true ||
-        (request.auth.token.role is string &&
-          request.auth.token.role.lower() in ['super_admin', 'super-admin'])
+    function roleRank() {
+      let signedIn = request.auth != null;
+      let uid = signedIn ? request.auth.uid : '__none__';
+      let adminPath = /databases/$(database)/documents/admins/$(uid);
+      let hasDoc = signedIn && exists(adminPath);
+      let docData = hasDoc ? get(adminPath).data : {};
+      let docActive = !hasDoc || docData.get('active', true) != false;
+      let rawDocRole = hasDoc ? docData.get('role', '') : '';
+      let docRole = rawDocRole is string ? rawDocRole.lower() : '';
+      let docRank = !hasDoc ? 0 : (
+        docRole in ['super_admin', 'super-admin'] ? 4 :
+        (docRole == '' || docRole == 'admin') ? 3 :
+        docRole == 'editor' ? 2 :
+        docRole == 'support' ? 1 : 0
       );
-    }
-
-    function hasAdminClaim() {
-      return isSignedIn() && (
-        request.auth.token.admin == true ||
-        (request.auth.token.role is string &&
-          request.auth.token.role.lower() == 'admin')
+      let rawClaimRole = signedIn ? request.auth.token.get('role', '') : '';
+      let claimRole = rawClaimRole is string ? rawClaimRole.lower() : '';
+      let claimRank = !signedIn ? 0 : (
+        (request.auth.token.get('superAdmin', false) == true || claimRole in ['super_admin', 'super-admin']) ? 4 :
+        (request.auth.token.get('admin', false) == true || claimRole == 'admin') ? 3 :
+        claimRole == 'editor' ? 2 :
+        claimRole == 'support' ? 1 : 0
       );
-    }
-
-    function hasEditorClaim() {
-      return isSignedIn()
-        && request.auth.token.role is string
-        && request.auth.token.role.lower() == 'editor';
-    }
-
-    function hasSupportClaim() {
-      return isSignedIn()
-        && request.auth.token.role is string
-        && request.auth.token.role.lower() == 'support';
+      return (!signedIn || !docActive) ? 0 : (claimRank > docRank ? claimRank : docRank);
     }
 
     function isSuperAdmin() {
-      return isSignedIn() && !isDeactivatedAdmin() && (
-        hasSuperAdminClaim() ||
-        (hasActiveAdminDoc()
-          && adminDoc().data.role is string
-          && adminDoc().data.role.lower() in ['super_admin', 'super-admin'])
-      );
+      return roleRank() >= 4;
     }
 
     function isAdminOrSuperAdmin() {
-      return isSuperAdmin() || (
-        isSignedIn() && !isDeactivatedAdmin() && (
-          hasAdminClaim() ||
-          (hasActiveAdminDoc() && (
-            !('role' in adminDoc().data) ||
-            !(adminDoc().data.role is string) ||
-            adminDoc().data.role.lower() == '' ||
-            adminDoc().data.role.lower() == 'admin'
-          ))
-        )
-      );
+      return roleRank() >= 3;
     }
 
     function isEditorOrAbove() {
-      return isAdminOrSuperAdmin() || (
-        isSignedIn() && !isDeactivatedAdmin() && (
-          hasEditorClaim() ||
-          (hasActiveAdminDoc()
-            && adminDoc().data.role is string
-            && adminDoc().data.role.lower() == 'editor')
-        )
-      );
+      return roleRank() >= 2;
     }
 
     function isStaff() {
-      return isEditorOrAbove() || (
-        isSignedIn() && !isDeactivatedAdmin() && (
-          hasSupportClaim() ||
-          (hasActiveAdminDoc()
-            && adminDoc().data.role is string
-            && adminDoc().data.role.lower() == 'support')
-        )
-      );
+      return roleRank() >= 1;
     }
 
     function isValidTenDigitPhone(phone) {
@@ -105,26 +57,24 @@ service cloud.firestore {
     }
 
     function isProjectLockedToSuperAdmin(projData) {
-      return ('editPermissions' in projData)
-        && (projData.editPermissions is map)
-        && projData.editPermissions.accessMode == 'super_admin_only';
+      let perms = projData.get('editPermissions', {});
+      return perms is map && perms.get('accessMode', '') == 'super_admin_only';
     }
 
     function canStaffModifyProject(projData) {
-      return isSuperAdmin() || (
-        isEditorOrAbove()
-        && !isProjectLockedToSuperAdmin(projData)
+      let rank = roleRank();
+      let perms = projData.get('editPermissions', {});
+      let isMap = perms is map;
+      let accessMode = isMap ? perms.get('accessMode', 'all_admins') : 'all_admins';
+      let allowed = isMap ? perms.get('allowedRoles', []) : [];
+      return rank >= 4 || (
+        rank >= 2
+        && accessMode != 'super_admin_only'
         && (
-          !('editPermissions' in projData)
-          || !(projData.editPermissions is map)
-          || projData.editPermissions.accessMode != 'custom_roles'
+          accessMode != 'custom_roles'
           || (
-            ('allowedRoles' in projData.editPermissions)
-            && (projData.editPermissions.allowedRoles is list)
-            && (
-              (isAdminOrSuperAdmin() && 'admin' in projData.editPermissions.allowedRoles)
-              || ('editor' in projData.editPermissions.allowedRoles)
-            )
+            allowed is list
+            && ((rank >= 3 && 'admin' in allowed) || ('editor' in allowed))
           )
         )
       );
@@ -132,14 +82,14 @@ service cloud.firestore {
 
     // Public website & hero section CMS documents (read-only for visitors, editor+ write, admin+ delete)
     match /websiteContent/{docId} {
-      allow get: if docId in ['site', 'main'] || resource.data.published == true || isStaff();
-      allow list: if resource.data.published == true || isStaff();
+      allow get: if docId in ['site', 'main'] || resource.data.get('published', false) == true || isStaff();
+      allow list: if resource.data.get('published', false) == true || isStaff();
       allow create, update: if isEditorOrAbove();
       allow delete: if isAdminOrSuperAdmin();
     }
 
     match /siteSettings/{docId} {
-      allow get: if docId == 'main' || resource.data.published == true || isStaff();
+      allow get: if docId == 'main' || resource.data.get('published', false) == true || isStaff();
       allow list: if isStaff();
       allow create, update: if isEditorOrAbove();
       allow delete: if isAdminOrSuperAdmin();
@@ -154,32 +104,31 @@ service cloud.firestore {
 
     // Real estate property listings (public read only when published == true)
     match /properties/{propertyId} {
-      allow read: if resource.data.published == true || isStaff();
+      allow read: if resource.data.get('published', false) == true || isStaff();
       allow create, update: if isEditorOrAbove();
       allow delete: if isAdminOrSuperAdmin();
     }
 
     // Dynamic real estate projects (respects super_admin_only & custom_roles lock settings)
     match /projects/{projectId} {
-      allow read: if resource.data.status == 'published' || resource.data.published == true || isStaff();
+      allow read: if resource.data.get('status', '') == 'published' || resource.data.get('published', false) == true || isStaff();
       allow create: if isEditorOrAbove()
         && (!isProjectLockedToSuperAdmin(request.resource.data) || isSuperAdmin());
-      allow update: if isSuperAdmin()
-        || (canStaffModifyProject(resource.data) && !isProjectLockedToSuperAdmin(request.resource.data));
-      allow delete: if isSuperAdmin()
-        || (isAdminOrSuperAdmin() && canStaffModifyProject(resource.data));
+      allow update: if canStaffModifyProject(resource.data)
+        && (!isProjectLockedToSuperAdmin(request.resource.data) || isSuperAdmin());
+      allow delete: if isAdminOrSuperAdmin() && canStaffModifyProject(resource.data);
     }
 
     // Approved locations (public read only when active == true)
     match /locations/{locationId} {
-      allow read: if resource.data.active == true || isStaff();
+      allow read: if resource.data.get('active', false) == true || isStaff();
       allow create, update: if isEditorOrAbove();
       allow delete: if isAdminOrSuperAdmin();
     }
 
     // Market insights (public read only when published == true)
     match /insights/{insightId} {
-      allow read: if resource.data.published == true || isStaff();
+      allow read: if resource.data.get('published', false) == true || isStaff();
       allow create, update: if isEditorOrAbove();
       allow delete: if isAdminOrSuperAdmin();
     }
