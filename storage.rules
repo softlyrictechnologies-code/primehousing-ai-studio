@@ -2,30 +2,48 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
+    function normalizeRole(raw) {
+      return raw is string ? raw.lower() : '';
+    }
+
+    function rankOfRole(role) {
+      return role in ['super_admin', 'super-admin'] ? 4 :
+        role == 'admin' ? 3 :
+        role == 'editor' ? 2 :
+        role == 'support' ? 1 : 0;
+    }
+
+    function claimRank() {
+      let signedIn = request.auth != null;
+      let role = signedIn ? normalizeRole(request.auth.token.get('role', '')) : '';
+      return !signedIn ? 0 : (
+        (request.auth.token.get('superAdmin', false) == true || role in ['super_admin', 'super-admin']) ? 4 :
+        (request.auth.token.get('admin', false) == true || role == 'admin') ? 3 :
+        rankOfRole(role)
+      );
+    }
+
+    function docRank() {
+      let uid = request.auth != null ? request.auth.uid : '__none__';
+      let path = /databases/(default)/documents/admins/$(uid);
+      let hasDoc = request.auth != null && firestore.exists(path);
+      let rawRole = hasDoc ? firestore.get(path).data.get('role', '') : '';
+      let role = normalizeRole(rawRole);
+      return !hasDoc ? 0 : (role == '' ? 3 : rankOfRole(role));
+    }
+
+    function isAdminDocInactive(uid) {
+      let path = /databases/(default)/documents/admins/$(uid);
+      return firestore.exists(path) && firestore.get(path).data.get('active', true) == false;
+    }
+
     function roleRank() {
       let signedIn = request.auth != null;
       let uid = signedIn ? request.auth.uid : '__none__';
-      let adminPath = /databases/(default)/documents/admins/$(uid);
-      let hasDoc = signedIn && firestore.exists(adminPath);
-      let docData = hasDoc ? firestore.get(adminPath).data : {};
-      let docActive = !hasDoc || docData.get('active', true) != false;
-      let rawDocRole = hasDoc ? docData.get('role', '') : '';
-      let docRole = rawDocRole is string ? rawDocRole.lower() : '';
-      let docRank = !hasDoc ? 0 : (
-        docRole in ['super_admin', 'super-admin'] ? 4 :
-        (docRole == '' || docRole == 'admin') ? 3 :
-        docRole == 'editor' ? 2 :
-        docRole == 'support' ? 1 : 0
-      );
-      let rawClaimRole = signedIn ? request.auth.token.get('role', '') : '';
-      let claimRole = rawClaimRole is string ? rawClaimRole.lower() : '';
-      let claimRank = !signedIn ? 0 : (
-        (request.auth.token.get('superAdmin', false) == true || claimRole in ['super_admin', 'super-admin']) ? 4 :
-        (request.auth.token.get('admin', false) == true || claimRole == 'admin') ? 3 :
-        claimRole == 'editor' ? 2 :
-        claimRole == 'support' ? 1 : 0
-      );
-      return (!signedIn || !docActive) ? 0 : (claimRank > docRank ? claimRank : docRank);
+      let inactive = signedIn && isAdminDocInactive(uid);
+      let cRank = signedIn && !inactive ? claimRank() : 0;
+      let dRank = signedIn && !inactive ? docRank() : 0;
+      return cRank > dRank ? cRank : dRank;
     }
 
     function isAdminOrSuperAdmin() {
