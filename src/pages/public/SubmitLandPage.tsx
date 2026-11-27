@@ -40,7 +40,7 @@ export function SubmitLandPage() {
   const [submittedRef, setSubmittedRef] = useState<string | null>(null);
 
   useEffect(() => {
-    document.title = 'Sell Your Plots — PRIME HOUSING';
+    document.title = 'Resale Plots — PRIME HOUSING';
     Promise.all([getActiveLocations(), getPublicCategories()])
       .then(([locs, cats]) => {
         setLocations(locs);
@@ -232,9 +232,9 @@ export function SubmitLandPage() {
   return (
     <div className="max-w-[1040px] mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
       <div className="mb-8 max-w-2xl">
-        <p className="text-xs font-medium text-[#9B0B5E] mb-1.5">Sell Your Plots</p>
+        <p className="text-xs font-medium text-[#9B0B5E] mb-1.5">Resale Plots</p>
         <h1 className="font-display text-3xl sm:text-4xl font-medium text-[#1C1F1E] tracking-tight">
-          Sell Your Plots or Land
+          Resale Plots or Land
         </h1>
         <p className="text-sm text-[#646B67] mt-2 leading-relaxed">
           Provide accurate parcel details below. All submissions are stored privately for administrator verification and are never published automatically.

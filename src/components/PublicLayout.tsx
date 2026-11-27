@@ -172,12 +172,12 @@ export function PublicLayout() {
                       )}
                     </div>
 
-                    {/* Option 2: Sell Your Plots */}
+                    {/* Option 2: Resale Plots */}
                     <Link
-                      to="/submit-land"
+                      to="/properties"
                       className="block px-4 py-2.5 text-sm font-medium text-[#1C1F1E] hover:bg-[#FAF8F9] hover:text-[#9B0B5E] transition-colors"
                     >
-                      Sell Your Plots
+                      Resale Plots
                     </Link>
                   </div>
                 </div>
@@ -283,12 +283,12 @@ export function PublicLayout() {
                     )}
                   </div>
 
-                  {/* Mobile Sell Your Plots */}
+                  {/* Mobile Resale Plots */}
                   <NavLink
-                    to="/submit-land"
+                    to="/properties"
                     className="block px-3 py-2 rounded-lg text-sm font-medium text-[#9B0B5E] bg-[#F7E8F1]"
                   >
-                    Sell Your Plots
+                    Resale Plots
                   </NavLink>
                 </div>
               )}

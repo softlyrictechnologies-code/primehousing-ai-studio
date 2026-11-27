@@ -2,21 +2,12 @@ interface SocialSidebarProps {
   contactPhone?: string;
 }
 
-const DEFAULT_WHATSAPP_NUMBER = '919840040327';
+const WHATSAPP_NUMBER = '919042461234';
 const FACEBOOK_URL = 'https://www.facebook.com/primehousingproperties';
 const INSTAGRAM_URL = 'https://www.instagram.com/primehousing.properties';
 
-function getWhatsAppUrl(rawPhone?: string): string {
-  const digits = (rawPhone || '').replace(/\D/g, '');
-  if (!digits) {
-    return `https://wa.me/${DEFAULT_WHATSAPP_NUMBER}`;
-  }
-  const normalized = digits.length === 10 ? `91${digits}` : digits;
-  return `https://wa.me/${normalized}`;
-}
-
-export function SocialSidebar({ contactPhone }: SocialSidebarProps) {
-  const whatsappUrl = getWhatsAppUrl(contactPhone);
+export function SocialSidebar(_props: SocialSidebarProps) {
+  const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}`;
 
   return (
     <aside
@@ -28,8 +19,8 @@ export function SocialSidebar({ contactPhone }: SocialSidebarProps) {
         href={whatsappUrl}
         target="_blank"
         rel="noopener noreferrer"
-        aria-label="Chat on WhatsApp"
-        title="WhatsApp"
+        aria-label="Chat on WhatsApp (+91 90424 61234)"
+        title="WhatsApp (+91 90424 61234)"
         className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl text-[#25D366] hover:bg-[#25D366]/10 transition-colors"
       >
         <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5" aria-hidden="true">
