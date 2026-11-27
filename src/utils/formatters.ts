@@ -49,6 +49,9 @@ export function generateReference(prefix: string): string {
 
 export function isValidPhone(phone: string): boolean {
   const digits = phone.replace(/\D/g, '');
+  if (digits.length === 14 && digits.startsWith('0091')) {
+    return /^\d{10}$/.test(digits.slice(4));
+  }
   if (digits.length === 12 && digits.startsWith('91')) {
     return /^\d{10}$/.test(digits.slice(2));
   }

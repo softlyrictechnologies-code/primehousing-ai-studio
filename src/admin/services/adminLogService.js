@@ -23,11 +23,14 @@ export async function logAdminAction({
 
   try {
     const payload = {
-      action: String(action || 'ADMIN_ACTION').toUpperCase(),
-      target: String(target || ''),
-      targetId: String(targetId || ''),
-      details: details && typeof details === 'object' ? details : { note: String(details || '') },
-      adminEmail: user.email || '',
+      action: (String(action || 'ADMIN_ACTION').trim() || 'ADMIN_ACTION').toUpperCase().slice(0, 80),
+      target: String(target || '').trim().slice(0, 80),
+      targetId: String(targetId || '').trim().slice(0, 160),
+      details:
+        details && typeof details === 'object' && !Array.isArray(details)
+          ? details
+          : { note: String(details || '') },
+      adminEmail: String(user.email || '').trim().slice(0, 254),
       adminUid: user.uid,
       userId: user.uid,
       createdAt: serverTimestamp(),

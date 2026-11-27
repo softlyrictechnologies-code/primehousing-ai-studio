@@ -574,8 +574,8 @@ export function HomePage() {
       {/* About & Why Choose Us */}
       <section className="bg-white border-t border-[#EAE1E6]">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-20">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-stretch mb-16">
-            <div className="lg:col-span-6 flex flex-col justify-center">
+          <div className="max-w-3xl mb-16">
+            <div className="flex flex-col justify-center">
               <p className="text-xs font-medium text-[#9B0B5E] mb-2">About {content.companyName}</p>
               <h2 className="font-display text-3xl font-medium text-[#1C1F1E] tracking-tight mb-4">
                 Built on verified deeds, clear boundaries, and direct counsel.
@@ -595,13 +595,6 @@ export function HomePage() {
                   <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
-            </div>
-            <div className="lg:col-span-6 rounded-xl overflow-hidden border border-[#EAE1E6]">
-              <ResilientImage
-                src={ASSET_IMAGES.aboutOfficeImg}
-                alt="PRIME HOUSING Advisory Studio"
-                className="w-full h-full min-h-[320px] object-cover"
-              />
             </div>
           </div>
 

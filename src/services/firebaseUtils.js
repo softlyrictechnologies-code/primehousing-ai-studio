@@ -13,6 +13,9 @@ export function toIsoString(val) {
 export function normalizePhone(rawPhone) {
   const raw = String(rawPhone || '').trim();
   const digits = raw.replace(/\D/g, '');
+  if (digits.length === 14 && digits.startsWith('0091')) {
+    return digits.slice(4);
+  }
   if (digits.length === 12 && digits.startsWith('91')) {
     return digits.slice(2);
   }

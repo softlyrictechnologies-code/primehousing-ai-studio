@@ -151,7 +151,19 @@ export async function savePropertyAdmin(propertyInput, imageFiles = [], onProgre
       images: finalImages,
       imageUrls: finalImages,
       image: finalImages[0] || '',
-      storagePaths: [...previousPaths.filter((p) => !removedUrls.some((u) => u.includes(p))), ...uploadedPaths],
+      storagePaths: [
+        ...previousPaths.filter(
+          (p) =>
+            !removedUrls.some((u) => {
+              try {
+                return u.includes(p) || decodeURIComponent(u).includes(p);
+              } catch {
+                return u.includes(p);
+              }
+            })
+        ),
+        ...uploadedPaths,
+      ],
       amenities: Array.isArray(propertyInput.features) ? propertyInput.features : [],
       featured: Boolean(propertyInput.isFeatured),
       coordinates:

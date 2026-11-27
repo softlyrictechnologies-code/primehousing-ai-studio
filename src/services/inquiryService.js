@@ -18,20 +18,34 @@ export async function createInquiry({
   enquiryCategory = '',
   source = 'website',
 }) {
+  const cleanName = String(name || '').trim().slice(0, 120);
+  const cleanPhone = normalizePhone(phone);
+  const cleanMessage = String(message || '').trim().slice(0, 2000);
+
+  if (!cleanName) {
+    throw new Error('Please enter your full name.');
+  }
+  if (!/^[0-9]{10}$/.test(cleanPhone)) {
+    throw new Error('Please provide a valid 10-digit mobile number.');
+  }
+  if (!cleanMessage) {
+    throw new Error('Please enter an enquiry message.');
+  }
+
   try {
     const payload = {
-      name: (name || '').trim(),
-      phone: normalizePhone(phone),
-      email: (email || '').trim(),
-      address: (address || '').trim(),
-      message: (message || '').trim(),
-      propertyId: propertyId || '',
-      propertyTitle: (propertyTitle || projectName || '').trim(),
-      projectId: projectId || '',
-      projectName: (projectName || '').trim(),
-      projectSlug: (projectSlug || '').trim(),
-      enquiryCategory: (enquiryCategory || '').trim(),
-      source,
+      name: cleanName,
+      phone: cleanPhone,
+      email: String(email || '').trim().slice(0, 254),
+      address: String(address || '').trim().slice(0, 300),
+      message: cleanMessage,
+      propertyId: String(propertyId || '').trim().slice(0, 120),
+      propertyTitle: String(propertyTitle || projectName || '').trim().slice(0, 200),
+      projectId: String(projectId || '').trim().slice(0, 120),
+      projectName: String(projectName || '').trim().slice(0, 200),
+      projectSlug: String(projectSlug || '').trim().slice(0, 160),
+      enquiryCategory: String(enquiryCategory || '').trim().slice(0, 120),
+      source: String(source || 'website').trim().slice(0, 80),
       status: 'new',
       createdAt: serverTimestamp(),
     };

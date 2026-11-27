@@ -31,9 +31,9 @@ export async function upsertUserProfile(uid, profile) {
     const existing = await getDoc(ref);
     const payload = {
       uid,
-      email: (profile.email || '').trim(),
-      name: (profile.name || '').trim(),
-      phone: (profile.phone || '').trim(),
+      email: String(profile?.email || '').trim().slice(0, 254),
+      name: String(profile?.name || '').trim().slice(0, 120),
+      phone: String(profile?.phone || '').trim().slice(0, 30),
       updatedAt: serverTimestamp(),
     };
     if (!existing.exists()) {

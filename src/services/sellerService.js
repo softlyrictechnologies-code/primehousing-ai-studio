@@ -14,6 +14,30 @@ function toAreaSqFt(area, areaUnit) {
 }
 
 export async function createSellerSubmission(input, imageFiles = [], onProgress = () => {}) {
+  const sellerName = String(input?.ownerName || input?.sellerName || '').trim().slice(0, 120);
+  const sellerPhone = normalizePhone(input?.phone || input?.sellerPhone);
+  const sellerEmail = String(input?.email || input?.sellerEmail || '').trim().slice(0, 254);
+  const location = String(input?.location || '').trim().slice(0, 160);
+  const districtTownVillage = String(input?.districtTownVillage || '').trim().slice(0, 160);
+  const propertyType = String(input?.propertyType || 'Residential Land').trim().slice(0, 80);
+  const areaUnit = String(input?.areaUnit || 'Acres').trim().slice(0, 40);
+  const areaValue = Number(input?.area) || 0;
+  const areaSqFt = toAreaSqFt(areaValue, areaUnit);
+  const expectedPrice = Number(input?.expectedPrice) || 0;
+  const description = String(input?.description || '').trim().slice(0, 2000);
+  const consentToContact = Boolean(input?.consentGiven ?? input?.consentToContact);
+
+  if (!sellerName) throw new Error('Landowner full name is required.');
+  if (!/^[0-9]{10}$/.test(sellerPhone)) throw new Error('A valid 10-digit mobile number is required.');
+  if (!location || !districtTownVillage) {
+    throw new Error('Primary location and district / town / village are required.');
+  }
+  if (!propertyType) throw new Error('Property category is required.');
+  if (!(areaValue > 0) || !(areaSqFt > 0)) throw new Error('Land area must be greater than 0.');
+  if (!(expectedPrice > 0)) throw new Error('Expected price must be greater than 0.');
+  if (!description) throw new Error('Property description is required.');
+  if (!consentToContact) throw new Error('Consent to contact is required.');
+
   const storagePaths = [];
   try {
     const submissionsRef = collection(db, SELLER_SUBMISSIONS_COLLECTION);
@@ -33,38 +57,38 @@ export async function createSellerSubmission(input, imageFiles = [], onProgress 
       storagePaths.push(storagePath);
     }
 
-    const existingUrls = Array.isArray(input.images)
+    const existingUrls = Array.isArray(input?.images)
       ? input.images.filter((url) => typeof url === 'string' && !url.startsWith('data:'))
       : [];
-    const finalImages = [...uploadedUrls, ...existingUrls];
+    const finalImages = [...uploadedUrls, ...existingUrls].slice(0, 10);
 
-    const areaSqFt = toAreaSqFt(input.area, input.areaUnit);
-    const title =
-      (input.title || '').trim() ||
-      `${input.propertyType || 'Land'} in ${input.location || 'Prime Location'}`;
+    const title = (
+      String(input?.title || '').trim() ||
+      `${propertyType || 'Land'} in ${location || 'Prime Location'}`
+    ).slice(0, 200);
 
     const payload = {
       title,
-      sellerName: (input.ownerName || input.sellerName || '').trim(),
-      sellerPhone: normalizePhone(input.phone || input.sellerPhone),
-      sellerEmail: (input.email || input.sellerEmail || '').trim(),
-      location: (input.location || '').trim(),
-      districtTownVillage: (input.districtTownVillage || '').trim(),
-      propertyType: (input.propertyType || 'Residential Land').trim(),
+      sellerName,
+      sellerPhone,
+      sellerEmail,
+      location,
+      districtTownVillage,
+      propertyType,
       areaSqFt,
-      area: `${input.area} ${input.areaUnit || 'Sq. Ft.'}`,
-      areaUnit: input.areaUnit || 'Acres',
-      areaValue: Number(input.area) || 0,
-      expectedPrice: Number(input.expectedPrice) || 0,
-      description: (input.description || '').trim(),
-      roadAccess: (input.roadAccess || '').trim(),
-      approvalDetails: (input.approvalDetails || '').trim(),
-      additionalNotes: (input.additionalNotes || '').trim(),
+      area: `${areaValue} ${areaUnit}`.slice(0, 80),
+      areaUnit,
+      areaValue,
+      expectedPrice,
+      description,
+      roadAccess: String(input?.roadAccess || '').trim().slice(0, 160),
+      approvalDetails: String(input?.approvalDetails || '').trim().slice(0, 200),
+      additionalNotes: String(input?.additionalNotes || '').trim().slice(0, 1000),
       images: finalImages,
-      storagePaths,
+      storagePaths: storagePaths.slice(0, 10),
       status: 'pending',
       reviewStatus: 'pending',
-      consentToContact: Boolean(input.consentGiven ?? input.consentToContact),
+      consentToContact,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
