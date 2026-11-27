@@ -162,6 +162,8 @@ describe('Firestore Security Rules & RBAC', () => {
       });
       await db.doc('locations/loc-active').set({ name: 'Madurai', active: true });
       await db.doc('locations/loc-inactive').set({ name: 'Hidden', active: false });
+      await db.doc('insights/ins-pub').set({ title: 'Published Insight', published: true });
+      await db.doc('insights/ins-draft').set({ title: 'Draft Insight', published: false });
       await db.doc('inquiries/inq-1').set({
         name: 'Seed Buyer',
         phone: '9876543210',
@@ -208,10 +210,17 @@ describe('Firestore Security Rules & RBAC', () => {
     await assertSucceeds(anonDb.doc('properties/prop-pub').get());
     await assertSucceeds(anonDb.doc('projects/proj-open').get());
     await assertSucceeds(anonDb.doc('locations/loc-active').get());
+    await assertSucceeds(anonDb.doc('insights/ins-pub').get());
 
     await assertFails(anonDb.doc('properties/prop-draft').get());
     await assertFails(anonDb.doc('projects/proj-locked').get());
     await assertFails(anonDb.doc('locations/loc-inactive').get());
+    await assertFails(anonDb.doc('insights/ins-draft').get());
+    await assertFails(anonDb.doc('properties/missing-prop').get());
+    await assertFails(anonDb.doc('projects/missing-proj').get());
+    await assertFails(anonDb.doc('locations/missing-loc').get());
+    await assertFails(anonDb.doc('insights/missing-ins').get());
+    await assertFails(anonDb.doc('websiteContent/missing-doc').get());
     await assertFails(anonDb.doc('inquiries/inq-1').get());
     await assertFails(anonDb.doc('contactMessages/msg-1').get());
     await assertFails(anonDb.doc('sellerSubmissions/sub-1').get());
@@ -242,6 +251,9 @@ describe('Firestore Security Rules & RBAC', () => {
     );
     await assertFails(
       anonDb.collection('sellerSubmissions').add(validSellerSubmissionPayload({ sellerId: 'forged-uid' }))
+    );
+    await assertFails(
+      anonDb.collection('sellerSubmissions').add(validSellerSubmissionPayload({ extraField: 'unexpected' }))
     );
   });
 
@@ -303,6 +315,12 @@ describe('Firestore Security Rules & RBAC', () => {
     await assertSucceeds(supportDb.doc('inquiries/inq-1').update({ status: 'contacted' }));
     await assertSucceeds(supportDb.doc('sellerSubmissions/sub-1').update({ reviewStatus: 'rejected' }));
     await assertFails(supportDb.doc('inquiries/inq-1').delete());
+    await assertFails(supportDb.doc('contactMessages/msg-1').delete());
+    await assertFails(supportDb.doc('sellerSubmissions/sub-1').delete());
+    await assertFails(supportDb.doc('properties/prop-pub').delete());
+    await assertFails(supportDb.doc('projects/proj-open').delete());
+    await assertFails(supportDb.doc('users/user-a').delete());
+    await assertFails(supportDb.doc('admins/support-uid').delete());
     await assertFails(supportDb.doc('properties/prop-pub').update({ title: 'Support Blocked' }));
     await assertFails(supportDb.doc('locations/loc-active').update({ active: false }));
 
@@ -313,6 +331,7 @@ describe('Firestore Security Rules & RBAC', () => {
     await assertFails(editorDb.doc('inquiries/inq-1').delete());
     await assertFails(editorDb.doc('projects/proj-custom-admin').update({ name: 'Blocked For Editor' }));
     await assertFails(editorDb.doc('projects/proj-locked').update({ name: 'Blocked For Editor' }));
+    await assertFails(editorDb.doc('admins/new-editor').set({ role: 'editor', active: true }));
 
     // Admin: can delete properties/inquiries & edit custom-admin projects; blocked from super_admin_only projects & admins registry
     await assertSucceeds(adminDb.doc('projects/proj-custom-admin').update({ location: 'Coimbatore' }));
@@ -321,6 +340,8 @@ describe('Firestore Security Rules & RBAC', () => {
     await assertFails(adminDb.doc('projects/proj-locked').update({ name: 'Admin Blocked' }));
     await assertFails(adminDb.doc('projects/proj-locked').delete());
     await assertFails(adminDb.doc('admins/editor-uid').update({ role: 'super_admin' }));
+    await assertFails(adminDb.doc('admins/new-admin-created').set({ role: 'support', active: true }));
+    await assertFails(adminDb.doc('admins/support-uid').delete());
 
     // Super Admin: full access including locked projects and admins registry
     await assertSucceeds(superDb.doc('projects/proj-locked').update({ name: 'Super Admin Unlocked' }));

@@ -95,11 +95,11 @@ service firebase.storage {
       allow delete: if isEditorOrAbove();
     }
 
-    // Landowner submission images (public valid-image create; staff read/update; admin/super_admin delete)
+    // Landowner submission images (public valid-image create-only when new; staff read; editor+ update; admin/super_admin delete)
     match /sellerSubmissions/{submissionId}/{fileName} {
       allow read: if isStaff();
-      allow create: if isValidImage();
-      allow update: if isStaff() && isValidImage();
+      allow create: if (resource == null || isEditorOrAbove()) && isValidImage();
+      allow update: if isEditorOrAbove() && isValidImage();
       allow delete: if isAdminOrSuperAdmin();
     }
 

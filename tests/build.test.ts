@@ -46,7 +46,7 @@ describe('Production build and deployment artifact verification', () => {
 
     const storageRules = fs.readFileSync(storageRulesPath, 'utf8');
     expect(storageRules).toContain('roleRank()');
-    expect(storageRules).toContain('allow create: if isValidImage();');
+    expect(storageRules).toContain('allow create: if (resource == null || isEditorOrAbove()) && isValidImage();');
     expect(storageRules).toContain('match /{allPaths=**}');
   });
 

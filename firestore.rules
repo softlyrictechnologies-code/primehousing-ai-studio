@@ -100,14 +100,14 @@ service cloud.firestore {
 
     // Public website & hero section CMS documents (read-only for visitors, editor+ write, admin+ delete)
     match /websiteContent/{docId} {
-      allow get: if docId in ['site', 'main'] || resource.data.get('published', false) == true || isStaff();
-      allow list: if resource.data.get('published', false) == true || isStaff();
+      allow get: if docId in ['site', 'main'] || (resource != null && resource.data.get('published', false) == true) || isStaff();
+      allow list: if (resource != null && resource.data.get('published', false) == true) || isStaff();
       allow create, update: if isEditorOrAbove();
       allow delete: if isAdminOrSuperAdmin();
     }
 
     match /siteSettings/{docId} {
-      allow get: if docId == 'main' || resource.data.get('published', false) == true || isStaff();
+      allow get: if docId == 'main' || (resource != null && resource.data.get('published', false) == true) || isStaff();
       allow list: if isStaff();
       allow create, update: if isEditorOrAbove();
       allow delete: if isAdminOrSuperAdmin();
@@ -122,31 +122,31 @@ service cloud.firestore {
 
     // Real estate property listings (public read only when published == true)
     match /properties/{propertyId} {
-      allow read: if resource.data.get('published', false) == true || isStaff();
+      allow read: if (resource != null && resource.data.get('published', false) == true) || isStaff();
       allow create, update: if isEditorOrAbove();
       allow delete: if isAdminOrSuperAdmin();
     }
 
     // Dynamic real estate projects (respects super_admin_only & custom_roles lock settings)
     match /projects/{projectId} {
-      allow read: if resource.data.get('status', '') == 'published' || resource.data.get('published', false) == true || isStaff();
+      allow read: if (resource != null && (resource.data.get('status', '') == 'published' || resource.data.get('published', false) == true)) || isStaff();
       allow create: if isEditorOrAbove()
         && (!isProjectLockedToSuperAdmin(request.resource.data) || isSuperAdmin());
-      allow update: if canStaffModifyProject(resource.data)
+      allow update: if resource != null && canStaffModifyProject(resource.data)
         && (!isProjectLockedToSuperAdmin(request.resource.data) || isSuperAdmin());
-      allow delete: if isAdminOrSuperAdmin() && canStaffModifyProject(resource.data);
+      allow delete: if resource != null && isAdminOrSuperAdmin() && canStaffModifyProject(resource.data);
     }
 
     // Approved locations (public read only when active == true)
     match /locations/{locationId} {
-      allow read: if resource.data.get('active', false) == true || isStaff();
+      allow read: if (resource != null && resource.data.get('active', false) == true) || isStaff();
       allow create, update: if isEditorOrAbove();
       allow delete: if isAdminOrSuperAdmin();
     }
 
     // Market insights (public read only when published == true)
     match /insights/{insightId} {
-      allow read: if resource.data.get('published', false) == true || isStaff();
+      allow read: if (resource != null && resource.data.get('published', false) == true) || isStaff();
       allow create, update: if isEditorOrAbove();
       allow delete: if isAdminOrSuperAdmin();
     }

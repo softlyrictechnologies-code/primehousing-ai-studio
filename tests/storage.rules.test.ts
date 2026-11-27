@@ -19,6 +19,20 @@ function makeBytes(size: number): Uint8Array {
   return new Uint8Array(size);
 }
 
+async function clearAllStorageObjects() {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const rootRef = context.storage().ref();
+    const removeFolder = async (folderRef: typeof rootRef): Promise<void> => {
+      const { items, prefixes } = await folderRef.listAll();
+      await Promise.all([
+        ...items.map((item) => item.delete()),
+        ...prefixes.map((prefix) => removeFolder(prefix)),
+      ]);
+    };
+    await removeFolder(rootRef);
+  });
+}
+
 describe('Firebase Storage Security Rules', () => {
   beforeAll(async () => {
     testEnv = await initializeTestEnvironment({
@@ -44,7 +58,7 @@ describe('Firebase Storage Security Rules', () => {
 
   beforeEach(async () => {
     await testEnv.clearFirestore();
-    await testEnv.clearStorage();
+    await clearAllStorageObjects();
 
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const db = context.firestore();
@@ -135,7 +149,7 @@ describe('Firebase Storage Security Rules', () => {
       )
     );
 
-    // Anonymous overwrite (update) of existing sellerSubmissions object FAILS
+    // Anonymous overwrite of existing sellerSubmissions object FAILS
     await assertFails(
       Promise.resolve(
         anonStorage
@@ -143,6 +157,10 @@ describe('Firebase Storage Security Rules', () => {
           .put(makeBytes(64), { contentType: 'image/jpeg' })
       )
     );
+    await assertFails(
+      anonStorage.ref('sellerSubmissions/sub-1/parcel.jpg').updateMetadata({ contentType: 'image/jpeg' })
+    );
+    await assertFails(anonStorage.ref('sellerSubmissions/sub-1/parcel.jpg').delete());
 
     // Anonymous writes to properties/ and projects/ still FAIL
     await assertFails(
@@ -158,9 +176,17 @@ describe('Firebase Storage Security Rules', () => {
       )
     );
 
+    // Non-staff, support, and deactivated admin writes/overwrites/deletes denied
     await assertFails(
       Promise.resolve(
         userStorage.ref('properties/prop-1/hack.jpg').put(makeBytes(64), { contentType: 'image/jpeg' })
+      )
+    );
+    await assertFails(
+      Promise.resolve(
+        userStorage
+          .ref('sellerSubmissions/sub-1/parcel.jpg')
+          .put(makeBytes(64), { contentType: 'image/jpeg' })
       )
     );
     await assertFails(
@@ -172,15 +198,35 @@ describe('Firebase Storage Security Rules', () => {
     );
     await assertFails(
       Promise.resolve(
+        supportStorage
+          .ref('sellerSubmissions/sub-1/parcel.jpg')
+          .put(makeBytes(64), { contentType: 'image/jpeg' })
+      )
+    );
+    await assertFails(
+      supportStorage.ref('sellerSubmissions/sub-1/parcel.jpg').updateMetadata({ contentType: 'image/jpeg' })
+    );
+    await assertFails(
+      Promise.resolve(
         disabledStorage
           .ref('properties/prop-1/disabled.jpg')
+          .put(makeBytes(64), { contentType: 'image/jpeg' })
+      )
+    );
+    await assertFails(
+      Promise.resolve(
+        disabledStorage
+          .ref('sellerSubmissions/sub-1/parcel.jpg')
           .put(makeBytes(64), { contentType: 'image/jpeg' })
       )
     );
 
     await assertFails(anonStorage.ref('properties/prop-1/cover.jpg').delete());
     await assertFails(userStorage.ref('properties/prop-1/cover.jpg').delete());
+    await assertFails(userStorage.ref('sellerSubmissions/sub-1/parcel.jpg').delete());
     await assertFails(supportStorage.ref('properties/prop-1/cover.jpg').delete());
+    await assertFails(supportStorage.ref('sellerSubmissions/sub-1/parcel.jpg').delete());
+    await assertFails(disabledStorage.ref('sellerSubmissions/sub-1/parcel.jpg').delete());
   });
 
   it('denies invalid MIME types, oversized files, and unsupported storage paths', async () => {
